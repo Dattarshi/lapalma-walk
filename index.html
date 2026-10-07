@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>La Palma Walk</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f3ef; --panel:#fcfcfb; --rail:#14213d; --rail-ink:#c9d2e3; --rail-on:#ffffff;
+  --ink:#0b0b0b; --ink2:#52514e; --ink3:#86857f; --line:#e2e0da;
+  --accent:#2a78d6; --accent-ink:#ffffff;
+  --sup:#2a78d6; --uns:#a9a8a2; --ag:#e34948;
+  --ok:#0ca30c; --warn:#fab219;
+  --shadow:0 6px 24px rgba(20,33,61,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111110; --panel:#1a1a19; --rail:#0a1226; --rail-ink:#8e9ab3; --rail-on:#ffffff;
+    --ink:#ffffff; --ink2:#c3c2b7; --ink3:#8d8c85; --line:#2e2e2b;
+    --accent:#3987e5; --sup:#3987e5; --uns:#6b6a64; --ag:#e66767;
+    --shadow:0 6px 24px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111110; --panel:#1a1a19; --rail:#0a1226; --rail-ink:#8e9ab3; --rail-on:#ffffff;
+  --ink:#ffffff; --ink2:#c3c2b7; --ink3:#8d8c85; --line:#2e2e2b;
+  --accent:#3987e5; --sup:#3987e5; --uns:#6b6a64; --ag:#e66767;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:15px;-webkit-tap-highlight-color:transparent}
+button{font:inherit;cursor:pointer}
+.app{display:flex;height:100dvh;width:100vw;overflow:hidden}
+
+/* ---------- left rail ---------- */
+.rail{flex:0 0 200px;background:var(--rail);color:var(--rail-ink);display:flex;flex-direction:column;padding:14px 10px;gap:4px;z-index:1001}
+.brand{color:#fff;font-weight:700;font-size:15px;line-height:1.2;padding:4px 8px 14px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:8px}
+.brand small{display:block;font-weight:400;color:var(--rail-ink);font-size:12px;margin-top:3px}
+.nav{display:flex;align-items:center;gap:10px;background:none;border:0;color:var(--rail-ink);padding:11px 10px;border-radius:10px;text-align:left;font-size:14px;position:relative}
+.nav svg{flex:0 0 22px;width:22px;height:22px}
+.nav:hover{background:rgba(255,255,255,.06)}
+.nav.on{background:rgba(255,255,255,.12);color:var(--rail-on);font-weight:600}
+.nav .badge{margin-left:auto;background:#ffffff22;color:#fff;font-size:11px;border-radius:10px;padding:1px 7px;font-family:"IBM Plex Mono",monospace}
+.rail .spacer{flex:1}
+.rail .foot{font-size:11px;padding:8px;color:#7f8aa3;line-height:1.4}
+@media (max-width:760px){
+  .rail{flex-basis:68px;padding:10px 6px}
+  .brand{font-size:0;padding:4px 0 10px;text-align:center}
+  .brand::before{content:"LP";font-size:16px;color:#fff;font-weight:700}
+  .brand small{display:none}
+  .nav{flex-direction:column;gap:3px;font-size:10px;padding:9px 2px;text-align:center}
+  .nav .badge{position:absolute;top:2px;right:2px;font-size:9px;padding:0 4px}
+  .rail .foot{display:none}
+}
+
+/* ---------- views ---------- */
+.main{flex:1;position:relative;min-width:0}
+.view{position:absolute;inset:0;display:none;overflow:auto}
+.view.on{display:block}
+#view-map{overflow:hidden}
+#map{position:absolute;inset:0;background:#e9e7e1}
+.page{max-width:880px;margin:0 auto;padding:22px 16px 60px}
+.page h1{font-size:22px;margin:4px 0 4px}
+.page .sub{color:var(--ink2);margin:0 0 18px;font-size:14px;line-height:1.5}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.muted{color:var(--ink2)} .tiny{font-size:12px;color:var(--ink3)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:9px 14px;font-weight:500}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--ag)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px}
+.empty{color:var(--ink3);text-align:center;padding:30px 10px;line-height:1.6}
+
+/* ---------- map overlays ---------- */
+.topbar{position:absolute;top:12px;left:12px;right:12px;z-index:900;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+.topbar>*{pointer-events:auto}
+.chip{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:9px 12px;box-shadow:var(--shadow);font-size:13px;display:flex;align-items:center;gap:8px}
+.chip b{font-weight:600}
+.chip.btnlike{cursor:pointer}
+.gpsdot{width:9px;height:9px;border-radius:50%;background:var(--ink3);display:inline-block}
+.gpsdot.live{background:var(--ok);box-shadow:0 0 0 3px rgba(12,163,12,.2)}
+.gpsdot.err{background:var(--ag)}
+.walkbanner{position:absolute;top:12px;left:12px;right:12px;z-index:950;background:var(--rail);color:#fff;border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;display:none}
+.walkbanner.on{display:block}
+.walkbanner .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9fb0d0}
+.walkbanner .addr{font-size:19px;font-weight:700;margin:1px 0 6px}
+.walkbanner .next{font-size:14px;color:#dbe3f2}
+.walkbanner .next b{color:#fff}
+.walkbanner .prog{height:4px;background:#ffffff22;border-radius:2px;margin-top:9px;overflow:hidden}
+.walkbanner .prog i{display:block;height:100%;background:#5fb0ff;width:0}
+.walkbanner .wrow{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.walkbanner .wrow button{border:0;border-radius:9px;padding:8px 12px;font-weight:600;font-size:13px}
+.wb-done{background:#5fb0ff;color:#0a1226}
+.wb-nh{background:#ffffff1f;color:#fff}
+.wb-skip{background:transparent;color:#9fb0d0}
+.wb-end{background:transparent;color:#ff9b9b;margin-left:auto}
+
+.housecard{position:absolute;left:12px;bottom:14px;z-index:900;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;width:min(360px,calc(100% - 160px));display:none}
+.housecard.on{display:block}
+.housecard .addr{font-weight:700;font-size:16px}
+.housecard .meta{font-size:12px;color:var(--ink2);margin:3px 0 9px;display:flex;gap:6px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 8px;font-size:12px;border:1px solid var(--line);color:var(--ink2)}
+.pill i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.tagrow{display:flex;gap:6px;flex-wrap:wrap}
+.tag{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:7px 10px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.tag i{width:10px;height:10px;border-radius:50%}
+.tag.on{border-color:var(--ink);font-weight:600;box-shadow:inset 0 0 0 1px var(--ink)}
+.hc-close{position:absolute;top:6px;right:8px;border:0;background:none;color:var(--ink3);font-size:20px;line-height:1}
+
+.fabs{position:absolute;right:14px;bottom:16px;z-index:900;display:flex;gap:10px;align-items:flex-end}
+.fab{width:60px;height:60px;border-radius:50%;border:0;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:10px;font-weight:600;gap:2px}
+.fab svg{width:24px;height:24px}
+.fab.sign{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+.fab.rec{background:#d93025;color:#fff;width:68px;height:68px}
+.fab.rec.live{animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(217,48,37,.55)}100%{box-shadow:0 0 0 18px rgba(217,48,37,0)}}
+.rectime{position:absolute;right:14px;bottom:94px;z-index:900;background:#d93025;color:#fff;border-radius:10px;padding:6px 10px;font-family:"IBM Plex Mono",monospace;font-size:14px;display:none}
+.rectime.on{display:block}
+.maptools{position:absolute;right:14px;top:70px;z-index:900;display:flex;flex-direction:column;gap:8px}
+.tool{width:44px;height:44px;border-radius:12px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);color:var(--ink);display:flex;align-items:center;justify-content:center}
+.tool svg{width:22px;height:22px}
+.tool.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.legend{position:absolute;left:12px;top:64px;z-index:800;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:12px;box-shadow:var(--shadow);display:grid;gap:4px;color:var(--ink2)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:11px;height:11px;border-radius:50%;display:inline-block;border:2px solid transparent}
+@media (max-width:760px){ .legend{display:none} .housecard{width:calc(100% - 24px);bottom:96px} }
+
+/* ---------- sheets / modal ---------- */
+.scrim{position:fixed;inset:0;background:rgba(10,18,38,.45);z-index:2000;display:none;align-items:flex-end;justify-content:center}
+.scrim.on{display:flex}
+.sheet{background:var(--panel);color:var(--ink);width:min(560px,100%);max-height:88dvh;border-radius:18px 18px 0 0;padding:18px 16px 22px;overflow:auto;box-shadow:var(--shadow)}
+@media (min-width:761px){ .scrim{align-items:center} .sheet{border-radius:18px} }
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .sub{color:var(--ink2);font-size:13px;margin:0 0 14px;line-height:1.5}
+.bigchoice{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
+.bigchoice button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:12px;padding:14px 6px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px}
+.bigchoice button i{width:16px;height:16px;border-radius:50%}
+.bigchoice.two{grid-template-columns:1fr 1fr}
+input[type=search],input[type=text],select,textarea{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit}
+.streetlist{max-height:46dvh;overflow:auto;border:1px solid var(--line);border-radius:12px;margin:10px 0}
+.streetlist label{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer}
+.streetlist label:last-child{border-bottom:0}
+.streetlist label span.c{margin-left:auto;color:var(--ink3);font-family:"IBM Plex Mono",monospace;font-size:12px}
+.streetlist input{width:18px;height:18px;accent-color:var(--accent)}
+.est{background:var(--bg);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.5}
+.est.warn{border-left:4px solid var(--warn)}
+.consent{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border-radius:12px;padding:12px;font-size:13px;line-height:1.45;margin:8px 0 12px}
+.consent input{width:20px;height:20px;margin-top:1px;accent-color:var(--accent);flex:0 0 auto}
+
+/* ---------- lists ---------- */
+.note{display:grid;grid-template-columns:1fr auto;gap:6px 12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.note:last-child{border-bottom:0}
+.note .t{font-weight:600}
+.note audio{grid-column:1/-1;width:100%;height:36px}
+.note .acts{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--panel);color:var(--ink2);padding:7px 12px;font-size:13px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--panel);font-weight:600}
+table.t{width:100%;border-collapse:collapse;font-size:14px}
+table.t th,table.t td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+table.t th{font-size:12px;color:var(--ink3);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+table.t td.num,table.t th.num{text-align:right;font-family:"IBM Plex Mono",monospace}
+
+/* ---------- stats ---------- */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.kpi .v{font-size:26px;font-weight:700;font-family:"IBM Plex Mono",monospace;letter-spacing:-.02em}
+.kpi .l{font-size:12px;color:var(--ink2);margin-top:2px}
+.stack{display:flex;height:34px;gap:2px;margin:6px 0 10px}
+.stack div{height:100%;position:relative;min-width:0}
+.stack div:first-child{border-radius:6px 0 0 6px}
+.stack div:last-child{border-radius:0 6px 6px 0}
+.stack div:only-child{border-radius:6px}
+.slegend{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slegend .it{display:flex;gap:8px;align-items:flex-start}
+.slegend i{width:12px;height:12px;border-radius:3px;margin-top:4px;flex:0 0 auto}
+.slegend .p{font-size:22px;font-weight:700;font-family:"IBM Plex Mono",monospace}
+.slegend .n{font-size:12px;color:var(--ink2)}
+.tip{position:fixed;z-index:3000;background:var(--ink);color:var(--panel);font-size:12px;padding:6px 9px;border-radius:8px;pointer-events:none;display:none;white-space:nowrap}
+.bar2{height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.bar2 i{display:block;height:100%;background:var(--accent)}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:4000;background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:12px;font-size:14px;box-shadow:var(--shadow);display:none;max-width:90vw;text-align:center}
+.toast.on{display:block}
+.me-dot{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 6px rgba(26,115,232,.25)}
+/* ================= polish layer ================= */
+:root{ --cyan:#38b8ec; --cyan-d:#1d8fc6; --r:16px;
+  --sh-1:0 1px 2px rgba(20,33,61,.06),0 2px 8px rgba(20,33,61,.05);
+  --sh-2:0 2px 4px rgba(20,33,61,.06),0 10px 28px rgba(20,33,61,.10);
+  --sh-3:0 4px 10px rgba(20,33,61,.10),0 22px 48px rgba(20,33,61,.18);
+  --ease:cubic-bezier(.2,.8,.2,1); }
+body{background:radial-gradient(1200px 600px at 80% -10%,#e7f5fc 0,transparent 60%),var(--bg)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) body{background:var(--bg)} }
+
+/* rail */
+.rail{background:linear-gradient(180deg,#1a2b55 0%,#122042 55%,#0d1731 100%);box-shadow:4px 0 24px rgba(10,18,38,.25)}
+.brand{display:flex;align-items:center;gap:10px;font-size:15px}
+.brand .logo{width:34px;height:34px;flex:0 0 34px;border-radius:10px;background:linear-gradient(135deg,#4cc4f2,#1d8fc6);display:grid;place-items:center;box-shadow:0 6px 16px rgba(56,184,236,.45)}
+.brand .logo svg{width:22px;height:22px}
+.nav{transition:background .2s var(--ease),color .2s,transform .15s}
+.nav:active{transform:scale(.97)}
+.nav.on{background:linear-gradient(90deg,rgba(56,184,236,.28),rgba(56,184,236,.06));box-shadow:inset 3px 0 0 var(--cyan)}
+.nav.on svg{color:var(--cyan);filter:drop-shadow(0 0 6px rgba(56,184,236,.6))}
+.nav .badge{transition:transform .3s var(--ease)}
+.nav .badge.pop{animation:pop .45s var(--ease)}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.45);background:var(--cyan)}100%{transform:scale(1)}}
+@media (max-width:760px){
+  .brand{justify-content:center} .brand::before{content:none} .brand .bt{display:none}
+  .nav.on{box-shadow:inset 0 -3px 0 var(--cyan);background:rgba(56,184,236,.18)}
+}
+
+/* views */
+.view.on{animation:viewIn .32s var(--ease)}
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#view-map.on{animation:none}
+.page h1{font-size:26px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.page h1 .hi{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#4cc4f2,#1d8fc6);box-shadow:0 6px 16px rgba(56,184,236,.35);color:#fff}
+.page h1 .hi svg{width:20px;height:20px}
+.card{border-radius:var(--r);box-shadow:var(--sh-1);border-color:transparent;transition:box-shadow .25s var(--ease),transform .25s var(--ease)}
+.card:hover{box-shadow:var(--sh-2)}
+.card h2{display:flex;align-items:center;gap:8px}
+.card h2 .step{width:22px;height:22px;border-radius:50%;background:#e4f4fc;color:var(--cyan-d);font-size:12px;display:grid;place-items:center;font-weight:700}
+
+/* buttons */
+.btn{transition:transform .12s var(--ease),box-shadow .2s,background .2s,border-color .2s;box-shadow:var(--sh-1)}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--sh-2)}
+.btn:active:not(:disabled){transform:translateY(0) scale(.97)}
+.btn.primary{background:linear-gradient(135deg,#3b8de6,#1f66c2);border-color:transparent;box-shadow:0 6px 16px rgba(42,120,214,.35)}
+.btn.go{background:linear-gradient(135deg,#4cc4f2,#1d8fc6);color:#fff;border-color:transparent;box-shadow:0 6px 16px rgba(56,184,236,.4)}
+.seg{box-shadow:var(--sh-1);border-radius:12px;background:var(--panel)}
+.seg button{transition:background .2s,color .2s}
+.seg button.on{background:linear-gradient(135deg,#1a2b55,#14213d);color:#fff}
+
+/* map tiles: softer, paper-like so the houses pop */
+.house-canvas{transition:opacity .18s}
+
+/* glass chips + tools */
+.chip,.tool,.legend{background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4);border-color:rgba(255,255,255,.6);box-shadow:var(--sh-2)}
+.chip.btnlike{transition:transform .15s var(--ease),box-shadow .2s}
+.chip.btnlike:hover{transform:translateY(-1px);box-shadow:var(--sh-3)}
+.chip.btnlike .ic{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#4cc4f2,#1d8fc6);display:grid;place-items:center;color:#fff}
+.chip.btnlike .ic svg{width:16px;height:16px}
+.tool{transition:transform .15s var(--ease),background .2s,box-shadow .2s;border-radius:14px}
+.tool:hover{transform:translateY(-1px)}
+.tool:active{transform:scale(.94)}
+.tool.on{background:linear-gradient(135deg,#4cc4f2,#1d8fc6);border-color:transparent;box-shadow:0 6px 18px rgba(56,184,236,.45)}
+.gpsdot.live{animation:gps 1.6s infinite}
+@keyframes gps{0%{box-shadow:0 0 0 0 rgba(12,163,12,.5)}100%{box-shadow:0 0 0 9px rgba(12,163,12,0)}}
+.legend{gap:6px;padding:10px 12px}
+.legend span{gap:8px}
+.legend svg{width:22px;height:18px}
+
+/* walk banner */
+.walkbanner{background:linear-gradient(135deg,rgba(26,43,85,.94),rgba(13,23,49,.94));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.08);box-shadow:var(--sh-3);border-radius:18px}
+.walkbanner.on{animation:dropIn .4s var(--ease)}
+@keyframes dropIn{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+.walkbanner .addr{display:flex;align-items:center;gap:10px}
+.walkbanner .addr svg{width:30px;height:26px;flex:0 0 auto;filter:drop-shadow(0 0 8px rgba(56,184,236,.7))}
+.walkbanner .addr.swap{animation:swap .45s var(--ease)}
+@keyframes swap{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+.walkbanner .prog{height:6px;border-radius:3px}
+.walkbanner .prog i{background:linear-gradient(90deg,#4cc4f2,#8fe0ff);transition:width .5s var(--ease);box-shadow:0 0 10px rgba(76,196,242,.7)}
+.walkbanner .wrow button{transition:transform .12s var(--ease),filter .2s}
+.walkbanner .wrow button:active{transform:scale(.95)}
+.wb-done{background:linear-gradient(135deg,#4cc4f2,#1d8fc6)!important;color:#fff!important;box-shadow:0 4px 14px rgba(56,184,236,.45)}
+
+/* house card */
+.housecard{border-radius:18px;box-shadow:var(--sh-3);border-color:transparent;padding:14px 16px 14px 14px}
+.housecard.on{animation:upIn .35s var(--ease)}
+@keyframes upIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.housecard .hc-top{display:flex;gap:12px;align-items:center}
+.housecard .hc-top svg{width:46px;height:40px;flex:0 0 auto}
+.tag{transition:transform .12s var(--ease),box-shadow .2s,border-color .2s;box-shadow:var(--sh-1)}
+.tag:active{transform:scale(.95)}
+
+/* FABs */
+.fab{transition:transform .15s var(--ease),box-shadow .2s}
+.fab:hover{transform:translateY(-2px)}
+.fab:active{transform:scale(.93)}
+.fab.sign{background:color-mix(in srgb,var(--panel) 85%,transparent);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.7)}
+.fab.rec{background:radial-gradient(circle at 30% 25%,#ff6b5e,#d93025 60%,#b3241b);box-shadow:0 10px 26px rgba(217,48,37,.45),inset 0 -3px 0 rgba(0,0,0,.15)}
+.rectime{border-radius:12px;background:linear-gradient(135deg,#ff5a4e,#d93025);box-shadow:0 8px 20px rgba(217,48,37,.4)}
+.rectime.on{animation:upIn .3s var(--ease)}
+.rectime .wave{display:inline-flex;gap:2px;margin-right:8px;vertical-align:middle}
+.rectime .wave i{width:3px;height:12px;background:#fff;border-radius:2px;animation:wv .9s infinite ease-in-out}
+.rectime .wave i:nth-child(2){animation-delay:.15s}.rectime .wave i:nth-child(3){animation-delay:.3s}.rectime .wave i:nth-child(4){animation-delay:.45s}
+@keyframes wv{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+
+/* sheets */
+.scrim{backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.scrim.on{animation:fade .25s}
+.scrim.on .sheet{animation:sheetUp .38s var(--ease)}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes sheetUp{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.sheet{box-shadow:var(--sh-3)}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:-6px auto 12px}
+.bigchoice button{transition:transform .12s var(--ease),box-shadow .2s,border-color .2s,background .2s;box-shadow:var(--sh-1)}
+.bigchoice button:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
+.bigchoice button:active{transform:scale(.96)}
+.bigchoice button.picked{border-color:transparent;box-shadow:0 0 0 2px var(--ink),var(--sh-2)}
+.bigchoice button svg{width:40px;height:34px}
+.streetlist label{transition:background .15s}
+.streetlist label:hover{background:color-mix(in srgb,var(--cyan) 7%,transparent)}
+.streetlist label:has(input:checked){background:color-mix(in srgb,var(--cyan) 12%,transparent)}
+
+/* toast */
+.toast{display:flex;align-items:center;gap:14px;opacity:0;transform:translate(-50%,16px);transition:opacity .25s,transform .3s var(--ease);pointer-events:none;border-radius:14px;padding:11px 14px 11px 16px;background:#14213d;color:#fff}
+.toast.on{display:flex;opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.toast:not(.on){display:flex}
+.toast button{border:0;background:rgba(255,255,255,.14);color:#8fe0ff;font-weight:700;border-radius:9px;padding:6px 10px}
+
+/* stats */
+.kpi{position:relative;overflow:hidden;border-color:transparent;box-shadow:var(--sh-1);transition:transform .2s var(--ease),box-shadow .2s;border-radius:var(--r)}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
+.kpi::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:var(--kc,var(--cyan))}
+.kpi .ki{position:absolute;right:12px;top:14px;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--kc,var(--cyan)) 14%,transparent);color:var(--kc,var(--cyan))}
+.kpi .ki svg{width:17px;height:17px}
+.stack{height:40px}
+.stack div{animation:grow .8s var(--ease) both;transform-origin:left;transition:filter .2s}
+.stack div:hover{filter:brightness(1.08) saturate(1.1)}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.bar2{height:12px;border-radius:6px}
+.bar2 i{background:linear-gradient(90deg,#4cc4f2,#1d8fc6);animation:grow .8s var(--ease) both;transform-origin:left}
+
+/* empty states */
+.empty svg{width:140px;height:80px;display:block;margin:0 auto 10px;opacity:.95}
+
+/* confetti */
+.confetti{position:fixed;width:8px;height:12px;border-radius:2px;z-index:5000;pointer-events:none;animation:conf 1s var(--ease) forwards}
+@keyframes conf{to{transform:translate(var(--dx),var(--dy)) rotate(var(--rot));opacity:0}}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+
+.route-flow{animation:flow 1.2s linear infinite}@keyframes flow{to{stroke-dashoffset:-15}}
+.pin{color:#fff;font:600 11px 'IBM Plex Sans',sans-serif;padding:4px 9px;border-radius:9px;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;display:inline-block}
+/* 3D map extras */
+#map{background:linear-gradient(#cfeaf8,#eef5f8)}
+.maplibregl-ctrl-group{border-radius:12px!important;box-shadow:var(--sh-2)!important;overflow:hidden}
+.maplibregl-ctrl-group button{width:38px!important;height:38px!important}
+.maplibregl-ctrl-bottom-left{margin-bottom:6px}
+.mpin{font:700 10.5px "IBM Plex Sans",system-ui,sans-serif;letter-spacing:.05em;color:#fff;padding:5px 10px;border-radius:999px;white-space:nowrap;box-shadow:0 6px 16px rgba(10,18,38,.3);pointer-events:none}
+.mpin.cur{background:linear-gradient(135deg,#4cc4f2,#1d8fc6);animation:float 2.2s ease-in-out infinite}
+.mpin.cur::after{content:"";position:absolute;left:50%;bottom:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:#1d8fc6}
+.mpin.next{background:#14213d;font-size:9.5px;padding:4px 8px}
+.mpin.start{background:linear-gradient(135deg,#22c55e,#0ca30c)}
+.mpin.finish{background:linear-gradient(135deg,#1a2b55,#14213d)}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -5px}}
+.me-dot{width:20px;height:20px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 8px rgba(26,115,232,.22),0 4px 10px rgba(0,0,0,.3)}
+.help ol{padding-left:20px;margin:6px 0 12px;line-height:1.55;font-size:14px}
+.help h4{margin:14px 0 4px;font-size:14px}
+.help .why{background:var(--bg);border-left:4px solid var(--warn);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Sections">
+    <div class="brand"><span class="logo"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9H3z" fill="#fff"/><path d="M3 11 12 4l9 7" fill="none" stroke="#bfe9fb" stroke-width="1.6" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" fill="#1d8fc6"/></svg></span><span class="bt">La Palma Walk<small>Nitesh Patel · door-to-door</small></span></div>
+    <button class="nav on" data-view="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>Map</button>
+    <button class="nav" data-view="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Voice notes<span class="badge" id="b-notes">0</span></button>
+    <button class="nav" data-view="route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/></svg>Optimised path</button>
+    <button class="nav" data-view="signs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="10" rx="1.5"/><path d="M9 14v7M15 14v7"/></svg>Signs<span class="badge" id="b-signs">0</span></button>
+    <button class="nav" data-view="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</button>
+    <div class="spacer"></div>
+    <div class="foot">Data: © OpenStreetMap contributors (ODbL). Saved on this device only.</div>
+  </nav>
+
+  <main class="main">
+    <!-- MAP -->
+    <section class="view on" id="view-map">
+      <div id="map"></div>
+      <div class="topbar" id="topbar">
+        <div class="chip btnlike" id="areaChip"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/></svg></span><b id="areaTxt">Choose walk area</b><span class="muted" id="areaSub"></span></div>
+        <div class="chip" id="gpsChip"><span class="gpsdot" id="gpsDot"></span><span id="gpsTxt">GPS off</span></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="maptools">
+        <button class="tool" id="tLocate" title="Turn on live location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/></svg></button>
+        <button class="tool" id="tRoute" title="Optimised path"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/></svg></button>
+        <button class="tool" id="tFit" title="Show whole walk area"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      </div>
+      <div class="walkbanner" id="walkBanner">
+        <div class="lbl" id="wbLbl">Now at</div>
+        <div class="addr" id="wbNow"><span id="wbIcon"></span><span id="wbNowTxt">—</span></div>
+        <div class="next">Next: <b id="wbNext">—</b> <span id="wbDist"></span></div>
+        <div class="prog"><i id="wbProg"></i></div>
+        <div class="wrow">
+          <button class="wb-done" id="wbDone">✓ Talked</button>
+          <button class="wb-nh" id="wbNH">Not home</button>
+          <button class="wb-skip" id="wbSkip">Skip</button>
+          <button class="wb-end" id="wbEnd">End walk</button>
+        </div>
+      </div>
+      <div class="housecard" id="houseCard">
+        <button class="hc-close" id="hcClose" aria-label="Close">×</button>
+        <div class="hc-top"><span id="hcIcon"></span><div><div class="addr" id="hcAddr"></div><div class="meta" id="hcMeta"></div></div></div>
+        <div class="tiny" style="margin-bottom:6px">How did the conversation go?</div>
+        <div class="tagrow" id="hcTags"></div>
+      </div>
+      <div class="rectime" id="recTime"><span class="wave"><i></i><i></i><i></i><i></i></span><span id="recTxt">00:00</span></div>
+      <div class="fabs">
+        <button class="fab sign" id="fabSign" title="Sign placement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="10" rx="1.5"/><path d="M9 14v7M15 14v7"/></svg>Sign</button>
+        <button class="fab rec" id="fabRec" title="Record voice note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span id="recLbl">Record</span></button>
+      </div>
+    </section>
+
+    <!-- VOICE NOTES -->
+    <section class="view" id="view-notes"><div class="page">
+      <h1><span class="hi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>Voice notes</h1>
+      <p class="sub">Every recording is filed under the house it was made at. Change a tag here and the map and Stats update.</p>
+      <div class="row" style="margin-bottom:12px">
+        <div class="seg" id="notesFilter"><button data-f="all" class="on">All houses</button><button data-f="cur">Current house</button></div>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn sm" id="dlAllNotes">Download all audio</button>
+      </div>
+      <div class="card" id="notesList"></div>
+    </div></section>
+
+    <!-- ROUTE -->
+    <section class="view" id="view-route"><div class="page">
+      <h1><span class="hi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/></svg></span>Optimised path</h1>
+      <p class="sub">Orders the houses in your walk area into the shortest door-to-door walk. It stays on one street before moving to the next, so you aren't sent through back yards. The line on the map joins front doors with straight segments; it is a walking order, not turn-by-turn street directions.</p>
+      <div class="card">
+        <h2><span class="step">1</span>Walk area</h2>
+        <div id="routeArea" class="muted"></div>
+        <div class="row" style="margin-top:10px"><button class="btn" id="rChooseArea">Choose streets</button></div>
+      </div>
+      <div class="card">
+        <h2><span class="step">2</span>Starting point</h2>
+        <div class="seg" id="startMode"><button data-s="best" class="on">Best end (auto)</button><button data-s="gps">My live location</button><button data-s="house">A house I pick</button></div>
+        <p class="tiny" id="startHint" style="margin:10px 0 0"></p>
+      </div>
+      <div class="card">
+        <h2><span class="step">3</span>Build and walk</h2>
+        <div class="row"><button class="btn primary" id="rBuild">Build shortest path</button><button class="btn go" id="rStart" disabled>▶ Start walk</button><button class="btn danger sm" id="rClear">Clear path</button></div>
+        <div id="routeSummary" style="margin-top:12px"></div>
+      </div>
+    </div></section>
+
+    <!-- SIGNS -->
+    <section class="view" id="view-signs"><div class="page">
+      <h1><span class="hi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="10" rx="1.5"/><path d="M9 14v7M15 14v7"/></svg></span>Yard signs</h1>
+      <p class="sub">Houses where the resident agreed to a sign. The sign crew can work through this list in street order.</p>
+      <div class="row" style="margin-bottom:12px">
+        <div class="seg" id="signFilter"><button data-f="yes" class="on">Agreed</button><button data-f="no">Declined</button></div>
+        <span style="flex:1"></span>
+        <button class="btn sm" id="signCsv">Download list (CSV)</button>
+      </div>
+      <div class="card" id="signList"></div>
+    </div></section>
+
+    <!-- STATS -->
+    <section class="view" id="view-stats"><div class="page">
+      <h1><span class="hi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>Stats</h1>
+      <p class="sub">Built from the tag you give each conversation (Support / Unsure / Against) and the sign answers. Percentages count houses, not recordings: if a house has several notes, the latest tag counts.</p>
+      <div class="kpis" id="kpis"></div>
+      <div class="card">
+        <h2>Will they vote for him again?</h2>
+        <div class="tiny" id="sentBase"></div>
+        <div class="stack" id="sentStack"></div>
+        <div class="slegend" id="sentLegend"></div>
+        <details style="margin-top:12px"><summary class="tiny" style="cursor:pointer">Show as table</summary><table class="t" id="sentTable" style="margin-top:8px"></table></details>
+      </div>
+      <div class="card">
+        <h2>Signs</h2>
+        <div id="signStats"></div>
+      </div>
+      <div class="card">
+        <h2>Support by street</h2>
+        <p class="tiny" style="margin-top:-4px">Streets with at least one tagged conversation, most-supportive first.</p>
+        <table class="t" id="streetTable"></table>
+      </div>
+      <div class="card">
+        <h2>Data</h2>
+        <p class="tiny" style="margin-top:-4px">Everything lives in this browser on this phone. Export at the end of each day so a lost or reset phone doesn't lose the walk.</p>
+        <div class="row"><button class="btn" id="exportJson">Export results (JSON)</button><button class="btn danger" id="resetAll">Reset everything</button></div>
+      </div>
+    </div></section>
+  </main>
+</div>
+
+<!-- sheets -->
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const LP_DATA={"streets":["183rd Street","Achilles Circle","Ainsworth Lane","Alder Lane","Amberwood Avenue","Andre Lane","Andrew Drive","Arroyo Circle"],"h":[["5368",6,"",33.851952,-118.039774],["5448",6,"",33.851975,-118.03845],["5408",6,"",33.851951,-118.039102],["5418",6,"",33.851973,-118.038939],["5438",6,"",33.851964,-118.038609],["5398",6,"",33.851947,-118.039272],["5378",6,"",33.851945,-118.039605],["5388",6,"",33.85195,-118.039434],["5428",6,"",33.851953,-118.038777],["5368",1,"",33.852632,-118.039723],["5367",6,"",33.852361,-118.039812],["5377",6,"",33.852346,-118.039647],["5371",1,"",33.852835,-118.039693],["5369",1,"",33.853026,-118.039738],["5449",6,"",33.852383,-118.038444],["5419",6,"",33.852362,-118.038939],["5429",6,"",33.852382,-118.038775],["5439",6,"",33.852358,-118.038606],["5335",1,"",33.853034,-118.04032],["5317",1,"",33.853014,-118.040646],["5327",1,"",33.853026,-118.040486],["5287",1,"",33.853028,-118.041144],["5297",1,"",33.853012,-118.040978],["5307",1,"",33.853024,-118.040815],["5357",1,"",33.853064,-118.039982],["5347",1,"",33.853046,-118.040157],["5338",1,"",33.852632,-118.040308],["5326",1,"",33.852629,-118.040471],["5348",1,"",33.852638,-118.040144],["5358",1,"",33.852584,-118.039963],["5286",1,"",33.852641,-118.041129],["5305",6,"",33.852357,-118.040797],["5320",1,"",33.852628,-118.040637],["5295",6,"",33.852337,-118.040965],["5287",6,"",33.852353,-118.041126],["5306",1,"",33.852635,-118.0408],["5298",1,"",33.852633,-118.040967],["5319",6,"",33.852358,-118.040635],["5337",6,"",33.852377,-118.040306],["5327",6,"",33.852351,-118.040469],["5357",6,"",33.852345,-118.039977],["5347",6,"",33.85235,-118.04014],["5334",6,"",33.851945,-118.040281],["5358",6,"",33.851953,-118.039941],["5348",6,"",33.851962,-118.040116],["5314",6,"",33.851943,-118.040618],["5326",6,"",33.851947,-118.04045],["5306",6,"",33.851944,-118.040784],["5276",6,"",33.851947,-118.04129],["5260",6,"",33.851973,-118.041628],["5288",6,"",33.851939,-118.041118],["5268",6,"",33.851954,-118.041455],["5296",6,"",33.851934,-118.040951],["5252",6,"",33.851981,-118.041799],["5202",6,"",33.851961,-118.042643],["5232",6,"",33.851955,-118.04214],["5212",6,"",33.851954,-118.042478],["5222",6,"",33.851977,-118.042305],["5242",6,"",33.851964,-118.041971],["8052",5,"",33.845413,-118.041724],["8002",5,"",33.8461,-118.041746],["8012",5,"",33.845961,-118.04176],["8032",5,"",33.84569,-118.041737],["8062",5,"",33.845244,-118.041724],["8042",5,"",33.845549,-118.041748],["8022",5,"",33.845823,-118.041756],["8011",5,"",33.846065,-118.042239],["8021",5,"",33.845909,-118.042232],["8031",5,"",33.845725,-118.042216],["5031",3,"",33.847101,-118.04527],["5051",3,"",33.847086,-118.044927],["5091",3,"",33.847032,-118.044254],["5041",3,"",33.847119,-118.045111],["5081",3,"",33.847017,-118.044432],["5071",3,"",33.847013,-118.044597],["5061",3,"",33.847044,-118.044764],["5072",3,"",33.846576,-118.044589],["5082",3,"",33.846566,-118.044432],["5062",3,"",33.846598,-118.044757],["5052",3,"",33.846605,-118.044926],["5042",3,"",33.846639,-118.045104],["5112",6,"",33.851956,-118.044168],["5142",6,"",33.851959,-118.043663],["5122",6,"",33.851945,-118.043999],["5132",6,"",33.851946,-118.043827],["5162",6,"",33.851961,-118.04332],["5182",6,"",33.851973,-118.042981],["5102",6,"",33.851951,-118.044336],["5152",6,"",33.851954,-118.04349],["5172",6,"",33.851948,-118.04315],["5192",6,"",33.851968,-118.042817],["5052",6,"",33.85189,-118.045196],["5082",6,"",33.851896,-118.044702],["5072",6,"",33.851885,-118.044868],["5062",6,"",33.8519,-118.045033],["5042",6,"",33.851858,-118.045366],["5081",6,"",33.852313,-118.044707],["5061",6,"",33.852319,-118.045038],["5071",6,"",33.852307,-118.044871],["5041",6,"",33.852315,-118.045369],["5051",6,"",33.852303,-118.045202],["5031",6,"",33.852336,-118.045535],["5011",6,"",33.852156,-118.045825],["5021",6,"",33.852297,-118.045708],["5032",6,"",33.851863,-118.045528],["5012",6,"",33.852017,-118.045839],["5022",6,"",33.85189,-118.045759],["14000",0,"",33.865101,-118.033389],["7641",7,"",33.851561,-118.049425],["7661",7,"",33.851278,-118.049383],["7681",7,"",33.851004,-118.049368],["7631",7,"",33.851778,-118.049432],["7632",7,"",33.851764,-118.048888],["7622",7,"",33.851903,-118.049052],["7621",7,"",33.85188,-118.049257],["7691",7,"",33.850855,-118.049386],["7651",7,"",33.851416,-118.04939],["7671",7,"",33.851142,-118.049391],["7662",7,"",33.851284,-118.04891],["7672",7,"",33.851146,-118.048909],["7692",7,"",33.850869,-118.048911],["7682",7,"",33.851009,-118.048906],["7652",7,"",33.851424,-118.048888],["7642",7,"",33.851561,-118.048876],["8042",2,"",33.845454,-118.053964],["8052",2,"",33.845303,-118.053973],["8032",2,"",33.845604,-118.053975],["8041",2,"",33.845517,-118.054424],["8051",2,"",33.845367,-118.054426],["8031",2,"",33.845669,-118.05447],["8021",2,"",33.845835,-118.054429],["8102",2,"",33.844546,-118.053954],["4511",4,"",33.843764,-118.053839],["8132",2,"",33.844092,-118.053955],["8112",2,"",33.844397,-118.053966],["8062",2,"",33.845148,-118.05397],["8142",2,"",33.843934,-118.053919],["4521",4,"",33.843681,-118.05367],["8092",2,"",33.844698,-118.053967],["8122",2,"",33.844245,-118.053968],["8082",2,"",33.844849,-118.053971],["8072",2,"",33.844999,-118.053942],["8131",2,"",33.844124,-118.054435],["8161",2,"",33.843648,-118.05439],["8141",2,"",33.843973,-118.05443],["8101",2,"",33.844577,-118.054451],["4522",4,"",33.843371,-118.053956],["8151",2,"",33.843824,-118.054423],["8111",2,"",33.844429,-118.054428],["4512",4,"",33.843461,-118.054097],["8121",2,"",33.844277,-118.054419],["4542",4,"",33.843211,-118.053662],["4502",4,"",33.84353,-118.054259],["4532",4,"",33.843297,-118.05382],["8071",2,"",33.845065,-118.054451],["8061",2,"",33.845215,-118.054419],["8081",2,"",33.844914,-118.054416],["4552",4,"",33.843086,-118.053511],["4562",4,"",33.843039,-118.053364],["4551",4,"",33.843406,-118.053241],["4561",4,"",33.843328,-118.053083],["4531",4,"",33.843606,-118.053534],["4571",4,"",33.843229,-118.052933],["4541",4,"",33.843505,-118.053372],["4575",4,"",33.843133,-118.0528],["4581",4,"",33.843044,-118.052637],["4702",4,"",33.841505,-118.050873],["4742",4,"",33.84105,-118.050156],["4712",4,"",33.841405,-118.05074],["4762",4,"",33.840883,-118.049859],["4736",4,"",33.841153,-118.050301],["4722",4,"",33.841334,-118.05059],["4772",4,"",33.840782,-118.049733],["4732",4,"",33.84124,-118.050453],["4752",4,"",33.840978,-118.049998],["4621",4,"",33.842674,-118.052027],["4591",4,"",33.842962,-118.052509],["4631",4,"",33.842587,-118.051892],["4611",4,"",33.84276,-118.052172],["4612",4,"",33.842395,-118.052352],["4572",4,"",33.842941,-118.053229],["4602",4,"",33.842581,-118.052635],["4606",4,"",33.842482,-118.052482],["4582",4,"",33.842748,-118.052933],["4622",4,"",33.842318,-118.052197],["4576",4,"",33.84285,-118.053083],["4592",4,"",33.842662,-118.05278],["4632",4,"",33.842223,-118.052059],["4672",4,"",33.841866,-118.051465],["4692",4,"",33.841588,-118.051021],["4682",4,"",33.841691,-118.051166],["4642",4,"",33.842139,-118.051903],["4662",4,"",33.841952,-118.051603],["4652",4,"",33.842042,-118.051758],["4676",4,"",33.841763,-118.051313],["4782",4,"",33.840665,-118.04958]],"b":[[-118.035047,33.83909],[-118.035074,33.840603],[-118.037238,33.84058],[-118.037254,33.841778],[-118.035175,33.841799],[-118.032804,33.841822],[-118.032841,33.844558],[-118.028497,33.844595],[-118.028565,33.850857],[-118.037259,33.85076],[-118.037323,33.85367],[-118.033033,33.853699],[-118.033154,33.858774],[-118.028629,33.858802],[-118.028728,33.866052],[-118.037611,33.866011],[-118.037531,33.862378],[-118.041892,33.862337],[-118.041884,33.861455],[-118.041872,33.860118],[-118.041877,33.858728],[-118.046211,33.858693],[-118.046137,33.853606],[-118.050444,33.853569],[-118.050397,33.84988],[-118.054753,33.849837],[-118.054698,33.846227],[-118.058812,33.846236],[-118.057936,33.845617],[-118.054829,33.843766],[-118.049821,33.840695],[-118.049817,33.839841],[-118.049813,33.83905],[-118.049815,33.838934],[-118.046991,33.838957],[-118.041435,33.835477],[-118.041465,33.839027],[-118.035047,33.83909]]};
+</script>
+<script>
+(function(){
+"use strict";
+// ---------------- data ----------------
+const S = LP_DATA.streets;
+const H = LP_DATA.h.map((r,i)=>({i, n:r[0], s:S[r[1]], u:r[2], lat:r[3], lng:r[4],
+  addr: r[0]+' '+S[r[1]]+(r[2]?' #'+r[2]:'')}));
+const byStreet = {}; H.forEach(h=>{(byStreet[h.s]=byStreet[h.s]||[]).push(h.i)});
+const MIN_PER_DOOR = 6;           // assumption shown to the user
+const ARRIVE_M = 25;              // GPS radius that counts as "at the next house"
+
+// ---------------- storage (best effort) ----------------
+const LS_KEY='lpwalk_v3';
+const blank = ()=>({walk:[], route:[], ptr:0, walking:false, startMode:'best', startHouse:null,
+  visit:{}, tag:{}, sign:{}, current:null});
+let st = blank();
+try{ const raw=localStorage.getItem(LS_KEY); if(raw) st=Object.assign(blank(), JSON.parse(raw)); }catch(e){}
+if(!st.walk.length) st.walk=[...S];
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(st)); }catch(e){} }
+
+// IndexedDB for audio
+let db=null;
+function idb(){ return new Promise((res)=>{ if(db) return res(db);
+  try{ const rq=indexedDB.open('lpwalk_audio_v3',1);
+    rq.onupgradeneeded=()=>rq.result.createObjectStore('notes',{keyPath:'id'});
+    rq.onsuccess=()=>{db=rq.result;res(db)}; rq.onerror=()=>res(null);
+  }catch(e){res(null)} }); }
+const memNotes=[]; // fallback if IndexedDB unavailable
+async function putNote(n){ const d=await idb(); if(!d){memNotes.push(n);return;}
+  await new Promise(r=>{const tx=d.transaction('notes','readwrite');tx.objectStore('notes').put(n);tx.oncomplete=r;tx.onerror=r;}); }
+async function allNotes(){ const d=await idb(); if(!d) return memNotes.slice();
+  return new Promise(r=>{const out=[];const c=d.transaction('notes').objectStore('notes').openCursor();
+    c.onsuccess=e=>{const cur=e.target.result; if(cur){out.push(cur.value);cur.continue();} else r(out)}; c.onerror=()=>r(out);}); }
+async function delNote(id){ const d=await idb(); if(!d){const k=memNotes.findIndex(n=>n.id===id); if(k>=0)memNotes.splice(k,1); return;}
+  await new Promise(r=>{const tx=d.transaction('notes','readwrite');tx.objectStore('notes').delete(id);tx.oncomplete=r;}); }
+
+// ---------------- helpers ----------------
+const $=id=>document.getElementById(id);
+function toast(msg,ms,action){ const t=$('toast'); t.innerHTML=''; const sp=document.createElement('span'); sp.textContent=msg; t.appendChild(sp);
+  if(action){ const b=document.createElement('button'); b.textContent=action.label; b.onclick=()=>{ t.classList.remove('on'); action.fn(); }; t.appendChild(b); }
+  t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),ms||2600); }
+function buzz(p){ try{ navigator.vibrate && navigator.vibrate(p||12); }catch(e){} }
+// little paper house as SVG, used across the UI (legend, cards, sheets, empty states)
+function houseSVG(roof,o){ o=o||{}; const wall=o.wall||'#ffffff', side=o.side||'#e3e7ee', gable=o.gable||'#f6f7f9', rs=o.roofSide||roof, op=o.faded?.45:1;
+  return `<svg viewBox="0 0 48 40" style="opacity:${op}"><ellipse cx="25" cy="37" rx="20" ry="3.2" fill="rgba(20,33,61,.18)"/>
+  <path d="M26 36 44 30.5V16.5L26 22Z" fill="${side}"/><path d="M4 36h22V22H4Z" fill="${wall}"/>
+  <path d="M15 7 33 1.5 46 15.5 28 21Z" fill="${roof}"/><path d="M5.5 22.5H27L15 7Z" fill="${gable}"/>
+  <path d="M15 7 4 22.5h2.6L15 9.6Z" fill="${rs}"/><rect x="12.6" y="28" width="5" height="8" fill="${side}" opacity=".9"/></svg>`; }
+const CURSVG=()=>houseSVG('#5cc9f4',{wall:'#38b8ec',side:'#1d8fc6',gable:'#2eaee3',roofSide:'#2399cf'});
+function confetti(el){ const r=(el||document.body).getBoundingClientRect(); const cols=['#38b8ec','#2a78d6','#fab219','#0ca30c','#e87ba4','#ffffff'];
+  for(let k=0;k<26;k++){ const c=document.createElement('i'); c.className='confetti'; c.style.left=(r.left+r.width/2)+'px'; c.style.top=(r.top+r.height/2)+'px';
+    c.style.background=cols[k%cols.length]; const a=Math.random()*Math.PI*2, d=60+Math.random()*120;
+    c.style.setProperty('--dx',Math.cos(a)*d+'px'); c.style.setProperty('--dy',(Math.sin(a)*d-60)+'px'); c.style.setProperty('--rot',(Math.random()*720-360)+'deg');
+    document.body.appendChild(c); setTimeout(()=>c.remove(),1100); } }
+function dist(a,b){ // metres
+  const R=6371000, toR=Math.PI/180, dLat=(b.lat-a.lat)*toR, dLng=(b.lng-a.lng)*toR;
+  const x=Math.sin(dLat/2)**2+Math.cos(a.lat*toR)*Math.cos(b.lat*toR)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(x)); }
+function fmtM(m){ return m<1000? Math.round(m)+' m' : (m/1000).toFixed(1)+' km'; }
+function fmtMi(m){ return (m/1609.34).toFixed(1)+' mi'; }
+function fmtH(min){ const h=Math.floor(min/60), m=Math.round(min%60); return h? h+' h '+m+' min' : m+' min'; }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+const TAGS=[['support','Support','--sup'],['unsure','Unsure','--uns'],['against','Against','--ag']];
+function openSheet(html){ $('sheet').innerHTML=html; $('scrim').classList.add('on'); }
+function closeSheet(){ $('scrim').classList.remove('on'); }
+$('scrim').addEventListener('click',e=>{ if(e.target.id==='scrim') closeSheet(); });
+
+// ---------------- navigation ----------------
+document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>show(b.dataset.view)));
+function show(v){
+  document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id==='view-'+v));
+  if(v==='map') setTimeout(()=>map.resize(),50);
+  if(v==='notes') renderNotes(); if(v==='signs') renderSigns(); if(v==='stats') renderStats(); if(v==='route') renderRoutePage();
+}
+
+// ---------------- map (MapLibre GL, real 3D buildings + streets) ----------------
+const OFM_STYLE='https://tiles.openfreemap.org/styles/liberty';   // free, no key: roads, labels, building footprints + heights
+const FALLBACK_STYLE={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,maxzoom:19,attribution:'© OpenStreetMap contributors'}},
+  layers:[{id:'bg',type:'background',paint:{'background-color':'#eceae4'}},{id:'osm',type:'raster',source:'osm',paint:{'raster-saturation':-0.5,'raster-opacity':0.9}}]};
+const EMPTY={type:'FeatureCollection',features:[]};
+const BND=LP_DATA.b;
+function boundsOf(pts){ let a=[180,90],b=[-180,-90]; pts.forEach(p=>{a[0]=Math.min(a[0],p[0]);a[1]=Math.min(a[1],p[1]);b[0]=Math.max(b[0],p[0]);b[1]=Math.max(b[1],p[1]);}); return [a,b]; }
+const map=new maplibregl.Map({container:'map',style:OFM_STYLE,bounds:boundsOf(H.map(h=>[h.lng,h.lat])),fitBoundsOptions:{padding:60},
+  pitch:52,bearing:-18,maxPitch:72,antialias:true,attributionControl:{compact:true}});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-left');
+let usedFallback=false, layersReady=false, BASE_SRC=null;
+function useFallback(){ if(usedFallback) return; usedFallback=true; layersReady=false; map.setStyle(FALLBACK_STYLE); }
+map.on('error',()=>{ if(!map.isStyleLoaded()) useFallback(); });
+setTimeout(()=>{ if(!layersReady) useFallback(); },9000);
+map.on('style.load',setupLayers);
+let walkSet=new Set(st.walk.flatMap(s=>byStreet[s]||[]));
+function inWalk(i){ return walkSet.has(i); }
+let drawSet=new Set();
+
+function setupLayers(){
+  const style=map.getStyle(); BASE_SRC=null;
+  for(const l of style.layers){ if(l['source-layer']==='building'){ BASE_SRC=l.source; try{map.setLayoutProperty(l.id,'visibility','none');}catch(e){} } }
+  let lastB=-1; style.layers.forEach((l,k)=>{ if(l['source-layer']==='building') lastB=k; });
+  const firstSym= lastB>=0 && style.layers[lastB+1] ? style.layers[lastB+1].id : (style.layers.find(l=>l.type==='symbol')||{}).id;  // keep our 3D buildings where the style had its own
+  try{ map.setLight({anchor:'map',color:'#ffffff',intensity:0.38,position:[1.5,210,40]}); }catch(e){}
+  try{ if(map.setSky) map.setSky({'sky-color':'#a9dcf7','horizon-color':'#eaf5fb','sky-horizon-blend':0.7,'horizon-fog-blend':0.5,'fog-color':'#eef5f8','fog-ground-blend':0.15}); }catch(e){}
+  if(BASE_SRC){ // every other building in town: soft, muted 3D blocks
+    map.addLayer({id:'all-bldg-3d',type:'fill-extrusion',source:BASE_SRC,'source-layer':'building',minzoom:13.5,
+      paint:{'fill-extrusion-color':'#dedbd3','fill-extrusion-height':['coalesce',['get','render_height'],5],
+             'fill-extrusion-base':['coalesce',['get','render_min_height'],0],'fill-extrusion-opacity':0.88,'fill-extrusion-vertical-gradient':true}},firstSym);
+  }
+  map.addSource('lp-boundary',{type:'geojson',data:{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:BND}}});
+  map.addLayer({id:'lp-boundary',type:'line',source:'lp-boundary',paint:{'line-color':'#14213d','line-width':2,'line-dasharray':[3,3],'line-opacity':0.6}});
+  ['route','route-done','walk-bldg','cur-bldg','cur-pt','house-pts'].forEach(id=>map.addSource(id,{type:'geojson',data:EMPTY}));
+  const lw=(a,b)=>['interpolate',['linear'],['zoom'],13,a,18,b];
+  map.addLayer({id:'route-done',type:'line',source:'route-done',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#8a93a6','line-width':lw(2,5),'line-opacity':0.65,'line-dasharray':[0.5,2]}});
+  map.addLayer({id:'route-case',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':lw(5,13)}});
+  map.addLayer({id:'route-line',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#1f7fd1','line-width':lw(3,8)}});
+  map.addLayer({id:'route-flow',type:'line',source:'route',layout:{'line-join':'round'},paint:{'line-color':'#a6ecff','line-width':lw(1.5,3.5),'line-dasharray':[0,4,3]}});
+  // campaign houses: white walls + a coloured roof cap (stance), current house in cyan
+  map.addLayer({id:'cur-halo',type:'circle',source:'cur-pt',paint:{'circle-radius':20,'circle-color':'#38b8ec','circle-opacity':0.3,'circle-blur':0.35,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'walk-wall',type:'fill-extrusion',source:'walk-bldg',paint:{'fill-extrusion-color':['get','wall'],'fill-extrusion-height':['get','h'],'fill-extrusion-base':0,'fill-extrusion-opacity':0.98,'fill-extrusion-vertical-gradient':true}});
+  map.addLayer({id:'walk-roof',type:'fill-extrusion',source:'walk-bldg',paint:{'fill-extrusion-color':['get','roof'],'fill-extrusion-height':['+',['get','h'],1.1],'fill-extrusion-base':['get','h'],'fill-extrusion-opacity':1}});
+  map.addLayer({id:'cur-bldg',type:'fill-extrusion',source:'cur-bldg',paint:{'fill-extrusion-color':'#38b8ec','fill-extrusion-height':['get','h'],'fill-extrusion-base':0,'fill-extrusion-opacity':1,'fill-extrusion-vertical-gradient':true}});
+  map.addLayer({id:'house-pts',type:'circle',source:'house-pts',maxzoom:15.2,paint:{'circle-radius':['interpolate',['linear'],['zoom'],11,2.5,15,6],'circle-color':['get','roof'],'circle-stroke-color':'#ffffff','circle-stroke-width':1.5}});
+  layersReady=true; harvest(); refreshAll(); drawRoute();
+}
+
+// ---- footprints: take each campaign house's real outline from the map's building data ----
+const FP={};   // house index -> {rings,h,real}
+function boxFor(i){ const h=H[i], dLat=6/111320, dLng=7/(111320*Math.cos(h.lat*Math.PI/180));
+  return {rings:[[[h.lng-dLng,h.lat-dLat],[h.lng+dLng,h.lat-dLat],[h.lng+dLng,h.lat+dLat],[h.lng-dLng,h.lat+dLat],[h.lng-dLng,h.lat-dLat]]],h:5,real:false}; }
+function pip(pt,ring){ let c=false; for(let a=0,b=ring.length-1;a<ring.length;b=a++){ const [xa,ya]=ring[a],[xb,yb]=ring[b];
+  if(((ya>pt[1])!==(yb>pt[1])) && (pt[0]<(xb-xa)*(pt[1]-ya)/(yb-ya)+xa)) c=!c; } return c; }
+function grow(rings,f){ const r=rings[0]; let cx=0,cy=0; r.forEach(p=>{cx+=p[0];cy+=p[1]}); cx/=r.length; cy/=r.length;
+  return [r.map(p=>[cx+(p[0]-cx)*f, cy+(p[1]-cy)*f])]; }
+function harvest(){
+  if(!layersReady || !BASE_SRC || map.getZoom()<13.5) return;
+  const need=[...walkSet].filter(i=>!(FP[i]&&FP[i].real)); if(!need.length) return;
+  let feats; try{ feats=map.querySourceFeatures(BASE_SRC,{sourceLayer:'building'}); }catch(e){ return; }
+  let changed=false;
+  for(const f of feats){ const g=f.geometry; const polys= g.type==='Polygon'?[g.coordinates]: g.type==='MultiPolygon'? g.coordinates:[];
+    for(const poly of polys){ const ring=poly[0]; let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9; ring.forEach(p=>{minx=Math.min(minx,p[0]);maxx=Math.max(maxx,p[0]);miny=Math.min(miny,p[1]);maxy=Math.max(maxy,p[1]);});
+      for(const i of need){ if(FP[i]&&FP[i].real) continue; const pt=[H[i].lng,H[i].lat];
+        if(pt[0]<minx||pt[0]>maxx||pt[1]<miny||pt[1]>maxy) continue;
+        if(pip(pt,ring)){ FP[i]={rings:grow(poly,1.04),h:Math.max(3.5,+(f.properties.render_height||5)),real:true}; changed=true; } } } }
+  if(changed) refreshAll();
+}
+map.on('idle',harvest);
+function fp(i){ return FP[i]||boxFor(i); }
+
+// ---- colours ----
+function shade(hex,f){ hex=hex.replace('#',''); if(hex.length===3) hex=hex.split('').map(c=>c+c).join('');
+  const n=parseInt(hex,16); let r=n>>16,g=(n>>8)&255,b=n&255; const t=f<0?0:255, p=Math.abs(f);
+  r=Math.round((t-r)*p+r); g=Math.round((t-g)*p+g); b=Math.round((t-b)*p+b); return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }
+function roofColor(i){ const t=st.tag[i], v=st.visit[i]; if(t) return css(TAGS.find(x=>x[0]===t)[2]); if(v==='talked') return '#14213d'; return '#c9d0da'; }
+function wallColor(i){ return st.visit[i]==='nothome'? '#bdb9b0' : '#ffffff'; }
+function isHouse(i){ return walkSet.has(i) || st.visit[i] || st.tag[i] || i===curHouse(); }
+
+// ---- labels (HTML markers) ----
+function pinEl(cls,txt){ const d=document.createElement('div'); d.className='mpin '+cls; d.textContent=txt; return d; }
+const curLabel=new maplibregl.Marker({element:pinEl('cur','YOU ARE HERE'),anchor:'bottom',offset:[0,-62]});
+const nextLabel=new maplibregl.Marker({element:pinEl('next','NEXT'),anchor:'left',offset:[16,-18]});
+const startPin=new maplibregl.Marker({element:pinEl('start','▶ START'),anchor:'bottom',offset:[0,-20]});
+const finishPin=new maplibregl.Marker({element:pinEl('finish','⚑ FINISH'),anchor:'bottom',offset:[0,-20]});
+let bounceAt=0;
+function refreshAll(){
+  drawSet=new Set(); H.forEach(h=>{ if(isHouse(h.i)) drawSet.add(h.i); });
+  if(!layersReady) return;
+  const cur=curHouse(); const feats=[], pts=[];
+  for(const i of drawSet){ const F=fp(i); pts.push({type:'Feature',properties:{id:i,roof:roofColor(i)},geometry:{type:'Point',coordinates:[H[i].lng,H[i].lat]}});
+    if(i===cur) continue; feats.push({type:'Feature',properties:{id:i,h:F.h,wall:wallColor(i),roof:roofColor(i)},geometry:{type:'Polygon',coordinates:F.rings}}); }
+  map.getSource('walk-bldg').setData({type:'FeatureCollection',features:feats});
+  map.getSource('house-pts').setData({type:'FeatureCollection',features:pts});
+  if(cur!=null){ const F=fp(cur);
+    map.getSource('cur-bldg').setData({type:'Feature',properties:{h:F.h+2.5},geometry:{type:'Polygon',coordinates:grow(F.rings,1.12)}});
+    map.getSource('cur-pt').setData({type:'Feature',properties:{},geometry:{type:'Point',coordinates:[H[cur].lng,H[cur].lat]}});
+    curLabel.getElement().textContent= st.walking?'YOU ARE HERE':'SELECTED'; curLabel.setLngLat([H[cur].lng,H[cur].lat]).addTo(map);
+  } else { map.getSource('cur-bldg').setData(EMPTY); map.getSource('cur-pt').setData(EMPTY); curLabel.remove(); }
+  const nx= st.walking? st.route[st.ptr+1] : null;
+  if(nx!=null) nextLabel.setLngLat([H[nx].lng,H[nx].lat]).addTo(map); else nextLabel.remove();
+}
+function restyle(){ refreshAll(); }
+function restyleAll(){ refreshAll(); }
+
+// ---- animation: pulsing halo, breathing cyan house, bounce, flowing route ----
+const DASH=[[0,4,3],[0.5,4,2.5],[1,4,2],[1.5,4,1.5],[2,4,1],[2.5,4,0.5],[3,4,0],[0,0.5,3,3.5],[0,1,3,3],[0,1.5,3,2.5],[0,2,3,2],[0,2.5,3,1.5],[0,3,3,1],[0,3.5,3,0.5]];
+let lastDash=0, di=0;
+(function anim(now){
+  if(layersReady && !document.hidden && document.querySelector('#view-map.on')){
+    if(curHouse()!=null){ const t=(now%1700)/1700, z=map.getZoom(), base=Math.max(8,(z-13)*9);
+      map.setPaintProperty('cur-halo','circle-radius',base*(0.8+1.2*t)); map.setPaintProperty('cur-halo','circle-opacity',0.42*(1-t));
+      const b=(now-bounceAt)/650; const k=b<1? Math.sin(b*Math.PI)*(1-b)*4 : 0; const F=fp(curHouse());
+      if(b<1.05) map.getSource('cur-bldg').setData({type:'Feature',properties:{h:F.h+2.5+k},geometry:{type:'Polygon',coordinates:grow(F.rings,1.12)}});
+      const g=0.5+0.5*Math.sin(now/420); map.setPaintProperty('cur-bldg','fill-extrusion-color', g>0.5?'#38b8ec':'#4cc6f4'); }
+    if(st.route.length && now-lastDash>70){ lastDash=now; di=(di+1)%DASH.length; map.setPaintProperty('route-flow','line-dasharray',DASH[di]); }
+  }
+  requestAnimationFrame(anim);
+})(0);
+
+// ---- tapping houses ----
+map.on('click',e=>{
+  const hit=layersReady? map.queryRenderedFeatures(e.point,{layers:['cur-bldg','walk-roof','walk-wall','house-pts']}) : [];
+  if(hit.length && hit[0].layer.id==='cur-bldg'){ const c=curHouse(); if(c!=null) return onHouseTap(c); }
+  const f=hit.find(x=>x.properties && x.properties.id!=null); if(f) return onHouseTap(+f.properties.id);
+  let best=null,bd=1e9; for(const i of drawSet){ const p=map.project([H[i].lng,H[i].lat]); const d=Math.hypot(p.x-e.point.x,p.y-e.point.y); if(d<bd){bd=d;best=i} }
+  if(best!=null && bd<26) onHouseTap(best);
+});
+map.on('mousemove',e=>{ if(!layersReady) return; const hit=map.queryRenderedFeatures(e.point,{layers:['walk-roof','walk-wall','cur-bldg','house-pts']}); map.getCanvas().style.cursor=hit.length?'pointer':''; });
+
+// ---- camera helpers ----
+function bearingTo(a,b){ const toR=Math.PI/180, y=Math.sin((b.lng-a.lng)*toR)*Math.cos(b.lat*toR), x=Math.cos(a.lat*toR)*Math.sin(b.lat*toR)-Math.sin(a.lat*toR)*Math.cos(b.lat*toR)*Math.cos((b.lng-a.lng)*toR); return Math.atan2(y,x)/toR; }
+function goTo(p,zoom,opt){ opt=opt||{}; map.easeTo({center:[p.lng,p.lat],zoom:zoom??Math.max(map.getZoom(),18),pitch:opt.pitch??Math.max(map.getPitch(),50),bearing:opt.bearing??map.getBearing(),duration:opt.duration??900,essential:true}); }
+function walkCamera(){ const i=st.route[st.ptr], nx=st.route[st.ptr+1]; if(i==null) return; const at=me&&st.walking? me : H[i];
+  goTo(at,18.3,{pitch:62,bearing: nx!=null? bearingTo(H[i],H[nx]) : map.getBearing(),duration:1000}); }
+
+// ---------------- walk area ----------------
+function updateAreaChip(){
+  const n=walkSet.size;
+  $('areaTxt').textContent = n? `${n} houses · ${st.walk.length} street${st.walk.length>1?'s':''}` : 'Choose walk area';
+  $('areaSub').textContent = n? '· edit' : `(${H.length.toLocaleString()} homes in La Palma)`;
+}
+$('areaChip').onclick=openAreaSheet; $('rChooseArea').onclick=openAreaSheet;
+function openAreaSheet(){
+  const sel=new Set(st.walk);
+  const streets=Object.keys(byStreet).sort();
+  openSheet(`<div class="grab"></div><h3>Campaign streets</h3>
+   <p class="sub">These are the only streets in this campaign. Untick any he won't get to this weekend; the route, map and Stats follow this list.</p>
+   <input type="search" id="stSearch" placeholder="Search streets…">
+   <div class="streetlist" id="stList">${streets.map(s=>`<label data-s="${esc(s.toLowerCase())}"><input type="checkbox" value="${esc(s)}" ${sel.has(s)?'checked':''}>${esc(s)}<span class="c">${byStreet[s].length}</span></label>`).join('')}</div>
+   <div class="est" id="stEst"></div>
+   <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn" id="stClear">Clear</button><button class="btn primary" id="stOk">Use these streets</button></div>`);
+  const upd=()=>{ const chosen=[...document.querySelectorAll('#stList input:checked')].map(x=>x.value);
+    const n=chosen.reduce((a,s)=>a+byStreet[s].length,0); const mins=n*MIN_PER_DOOR;
+    const e=$('stEst'); e.className='est'+(mins>16*60?' warn':'');
+    e.innerHTML= n? `<b>${n} houses</b> on ${chosen.length} street${chosen.length>1?'s':''}. At about ${MIN_PER_DOOR} min per door including walking: <b>${fmtH(mins)}</b> of door time.`+(mins>16*60?`<br>That's more than two 8-hour days. Trim streets or bring volunteers.`:'') : 'No streets chosen yet.'; };
+  $('stList').addEventListener('change',upd); upd();
+  $('stSearch').oninput=e=>{ const q=e.target.value.toLowerCase(); document.querySelectorAll('#stList label').forEach(l=>l.style.display=l.dataset.s.includes(q)?'':'none'); };
+  $('stClear').onclick=()=>{document.querySelectorAll('#stList input').forEach(x=>x.checked=false);upd();};
+  $('stOk').onclick=()=>{ st.walk=[...document.querySelectorAll('#stList input:checked')].map(x=>x.value);
+    walkSet=new Set(st.walk.flatMap(s=>byStreet[s]));
+    st.route=st.route.filter(i=>walkSet.has(i)); if(st.route.length!==walkSet.size){st.route=[];st.ptr=0;st.walking=false;}
+    save(); restyleAll(); drawRoute(); updateAreaChip(); closeSheet(); fitWalk(); renderRoutePage(); };
+}
+function fitWalk(){ const pts=[...(walkSet.size?walkSet:H.map(h=>h.i))].map(i=>[H[i].lng,H[i].lat]); map.fitBounds(boundsOf(pts),{padding:70,maxZoom:18,pitch:50,duration:900}); }
+$('tFit').onclick=fitWalk;
+
+// ---------------- selection / house card ----------------
+function curHouse(){ if(st.walking && st.route.length) return st.route[st.ptr]??null; return st.current; }
+function selectHouse(i, fromTap){
+  if(st.walking && fromTap){ // tapping during a walk jumps the pointer if that house is on the route
+    const k=st.route.indexOf(i); if(k>=0){ st.ptr=k; save(); updateWalk(); return; } }
+  st.current=i; save(); buzz(8); drawSel(); renderHouseCard();
+}
+function drawSel(){
+  bounceAt=performance.now(); refreshAll();
+}
+function renderHouseCard(){
+  const i=curHouse(); const c=$('houseCard');
+  if(i==null || st.walking){ c.classList.remove('on'); if(st.walking && i!=null) renderWalkTags(); return; }
+  c.classList.add('on'); $('hcAddr').textContent=H[i].addr; $('hcIcon').innerHTML=CURSVG();
+  $('hcMeta').innerHTML=metaPills(i);
+  $('hcTags').innerHTML=tagButtons(i);
+  wireTags($('hcTags'),i);
+}
+function metaPills(i){
+  const v=st.visit[i], sg=st.sign[i]; const out=[];
+  out.push(`<span class="pill">${inWalk(i)?'In walk area':'Outside walk area'}</span>`);
+  if(v) out.push(`<span class="pill">${v==='talked'?'Talked':'Not home'}</span>`);
+  if(sg) out.push(`<span class="pill">Sign: ${sg==='yes'?'Yes':'No'}</span>`);
+  const nn=noteCount[i]; if(nn) out.push(`<span class="pill">${nn} voice note${nn>1?'s':''}</span>`);
+  return out.join('');
+}
+function tagButtons(i){ return TAGS.map(t=>`<button class="tag ${st.tag[i]===t[0]?'on':''}" data-t="${t[0]}"><i style="background:var(${t[2]})"></i>${t[1]}</button>`).join(''); }
+function wireTags(el,i){ el.querySelectorAll('.tag').forEach(b=>b.onclick=()=>{ setTag(i, st.tag[i]===b.dataset.t?null:b.dataset.t); }); }
+function setTag(i,t){ if(t){st.tag[i]=t; st.visit[i]='talked';} else delete st.tag[i]; save(); restyle(i); renderHouseCard(); if(st.walking) updateWalk(); }
+$('hcClose').onclick=()=>{ st.current=null; save(); drawSel(); renderHouseCard(); };
+
+// ---------------- GPS ----------------
+let me=null, meMarker=null, meAcc=null, watchId=null, lastPan=0, userPannedAt=0;
+map.on('dragstart',()=>userPannedAt=Date.now());
+let gpsBlocked=false, gpsHelpShown=false;
+const IN_FRAME=(()=>{ try{ return window.self!==window.top; }catch(e){ return true; } })();
+const IS_FILE=location.protocol==='file:';
+function startGPS(manual){
+  if(!('geolocation' in navigator)){ gpsState('err','No GPS here'); gpsBlocked=true; if(manual) gpsHelp('none'); return; }
+  if(window.isSecureContext===false){ gpsState('err','GPS needs https'); gpsBlocked=true; if(manual) gpsHelp('insecure'); return; }
+  if(watchId!=null) return;
+  gpsState('','Finding you…');
+  watchId=navigator.geolocation.watchPosition(p=>{ gpsBlocked=false; onPos(p); }, err=>{
+    if(err.code===1){ gpsBlocked=true; gpsState('err','Location off · tap'); navigator.geolocation.clearWatch(watchId); watchId=null; $('tLocate').classList.remove('on');
+      if(manual || !gpsHelpShown) gpsHelp('denied'); }
+    else gpsState('err','Weak GPS · retrying');
+  },{enableHighAccuracy:true, maximumAge:3000, timeout:25000});
+  $('tLocate').classList.add('on');
+}
+// Explains WHY location failed on this device and how to fix it. The app keeps working without GPS.
+function gpsHelp(kind){
+  gpsHelpShown=true;
+  const where = IN_FRAME? `<div class="why"><b>Most likely cause:</b> this page is open inside a preview window (for example the file preview in the Claude app). Previews block location and the microphone. Download the file and open it directly in Chrome, Edge or Safari.</div>`
+    : IS_FILE? `<div class="why"><b>Most likely cause:</b> the page was opened straight from a file on disk. Some browsers refuse location for files. Use the <b>START</b> launcher in the project folder, which opens it as <code>http://localhost</code>, where location is allowed.</div>`
+    : kind==='insecure'? `<div class="why"><b>Cause:</b> this address isn't secure (not https or localhost), so the browser won't share location. Open it over https or through the START launcher.</div>`
+    : `<div class="why"><b>Cause:</b> the browser or the computer's system settings said no.</div>`;
+  openSheet(`<div class="grab"></div><div class="help"><h3>Location isn't available</h3><p class="sub">The walk still works without it: start from the best end and tap <b>✓ Talked</b> or <b>Not home</b> to move along. To turn live location on:</p>
+   ${where}
+   <h4>1 · Allow it in the browser</h4><ol><li>Click the icon at the left of the address bar (a lock or a slider icon).</li><li>Set <b>Location</b> (and <b>Microphone</b>) to <b>Allow</b>.</li><li>Reload the page.</li></ol>
+   <h4>2 · Turn it on in the computer or phone</h4><ol>
+   <li><b>Windows:</b> Settings → Privacy &amp; security → Location → turn on <i>Location services</i> and <i>Let desktop apps access your location</i>.</li>
+   <li><b>Mac:</b> System Settings → Privacy &amp; Security → Location Services → turn on, and tick your browser.</li>
+   <li><b>iPhone:</b> Settings → Privacy &amp; Security → Location Services → Safari Websites → <i>While Using</i>.</li>
+   <li><b>Android:</b> Settings → Location → on; then Chrome → Site settings → Location → allow this site.</li></ol>
+   <p class="tiny">Laptops estimate position from Wi-Fi and can be off by 50 m or more. Use a phone for the actual walk.</p>
+   <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn" id="ghClose">Continue without GPS</button><button class="btn primary" id="ghRetry">Try again</button></div></div>`);
+  $('ghClose').onclick=closeSheet; $('ghRetry').onclick=()=>{ closeSheet(); startGPS(true); };
+}
+$('gpsChip').style.cursor='pointer'; $('gpsChip').onclick=()=>{ if(gpsBlocked) gpsHelp('denied'); else startGPS(true); };
+function gpsState(cls,txt){ $('gpsDot').className='gpsdot '+cls; $('gpsTxt').textContent=txt; }
+function onPos(p){
+  me={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+  gpsState('live', `GPS ±${Math.round(me.acc)} m`);
+  if(!meMarker){ const d=document.createElement('div'); d.className='me-dot'; meMarker=new maplibregl.Marker({element:d}).setLngLat([me.lng,me.lat]).addTo(map); }
+  else meMarker.setLngLat([me.lng,me.lat]);
+  if(st.walking){
+    if(Date.now()-userPannedAt>12000) walkCamera();
+    // auto-advance: if we are clearly at the NEXT stop, move the pointer there
+    const nx=st.route[st.ptr+1];
+    if(nx!=null && me.acc<40 && dist(me,H[nx])<ARRIVE_M && dist(me,H[nx])<dist(me,H[st.route[st.ptr]])){
+      if(!st.visit[st.route[st.ptr]]) { /* leave unmarked: user decides */ }
+      st.ptr++; save(); updateWalk(); toast('Arrived: '+H[nx].addr);
+    } else updateWalk(true);
+  } else if(!st.current && walkSet.size){
+    // suggest nearest walk-area house when not walking
+    let best=null,bd=1e9; walkSet.forEach(i=>{const d=dist(me,H[i]); if(d<bd){bd=d;best=i}});
+    if(bd<ARRIVE_M){ st.current=best; drawSel(); renderHouseCard(); }
+  }
+}
+$('tLocate').onclick=()=>{ if(watchId==null) startGPS(true); else if(me) goTo(me,18); };
+
+// ---------------- route optimisation ----------------
+// Cost = straight-line metres, x3 when hopping to a different street. This keeps the walker on a street until it's done
+// instead of zig-zagging through back fences to the parallel street.
+function cost(a,b){ const d=dist(H[a],H[b]); return H[a].s===H[b].s? d : d*3; }
+function buildRoute(startPt){
+  const ids=[...walkSet]; if(!ids.length) return [];
+  // start: nearest house to start point
+  let first=ids[0], bd=1e12; ids.forEach(i=>{const d=dist(startPt,H[i]); if(d<bd){bd=d;first=i}});
+  // nearest neighbour
+  const left=new Set(ids); left.delete(first); const r=[first];
+  while(left.size){ const last=r[r.length-1]; let best=null,bc=1e12; left.forEach(j=>{const c=cost(last,j); if(c<bc){bc=c;best=j}}); r.push(best); left.delete(best); }
+  // 2-opt with a time budget (open path, start fixed)
+  const t0=performance.now(), budget= ids.length>600? 2500 : 1500; let improved=true;
+  while(improved && performance.now()-t0<budget){ improved=false;
+    for(let a=1;a<r.length-1 && performance.now()-t0<budget;a++){
+      for(let b=a+1;b<r.length;b++){
+        const A=r[a-1],B=r[a],C=r[b],D=r[b+1];
+        const before=cost(A,B)+(D!=null?cost(C,D):0), after=cost(A,C)+(D!=null?cost(B,D):0);
+        if(after+0.01<before){ let x=a,y=b; while(x<y){const t=r[x];r[x]=r[y];r[y]=t;x++;y--;} improved=true; }
+      } } }
+  return r;
+}
+// "Best end": try starting from each outer house and keep the shortest total walk.
+function buildBest(){ const ids=[...walkSet]; if(!ids.length) return [];
+  let cx=0,cy=0; ids.forEach(i=>{cx+=H[i].lng;cy+=H[i].lat}); const c={lng:cx/ids.length,lat:cy/ids.length};
+  const cands=ids.slice().sort((a,b)=>dist(c,H[b])-dist(c,H[a])).slice(0,6);
+  let best=null,bl=1e12; for(const k of cands){ const r=buildRoute(H[k]); const L=routeLength(r); if(L<bl){bl=L;best=r} } return best; }
+function routeLength(r){ let m=0; for(let k=1;k<r.length;k++) m+=dist(H[r[k-1]],H[r[k]]); return m; }
+function drawRoute(){
+  if(!layersReady) return;
+  const ll=a=>a.map(i=>[H[i].lng,H[i].lat]); const line=c=>c.length>1?{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:c}}:EMPTY;
+  if(!st.route.length){ map.getSource('route').setData(EMPTY); map.getSource('route-done').setData(EMPTY); startPin.remove(); finishPin.remove(); refreshAll(); return; }
+  const done=st.walking? st.route.slice(0,st.ptr+1):[]; const todo=st.walking? st.route.slice(st.ptr):st.route;
+  map.getSource('route').setData(line(ll(todo))); map.getSource('route-done').setData(line(ll(done)));
+  const s0=H[st.route[0]], e0=H[st.route.at(-1)]; startPin.setLngLat([s0.lng,s0.lat]).addTo(map); finishPin.setLngLat([e0.lng,e0.lat]).addTo(map);
+  refreshAll();
+}
+let pickingStart=false;
+$('startMode').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; st.startMode=b.dataset.s; save(); renderRoutePage();
+  if(st.startMode==='house'){ pickingStart=true; show('map'); toast('Tap the house he starts at.',4000); } });
+function onHouseTap(i){ if(pickingStart){ pickingStart=false; st.startHouse=i; save(); toast('Start: '+H[i].addr); show('route'); return; } selectHouse(i,true); }
+
+function doBuild(){
+  if(!walkSet.size){ toast('Choose the walk-area streets first.'); openAreaSheet(); return; }
+  let sp=null;
+  if(st.startMode==='best'){ sp=null; }
+  else if(st.startMode==='gps'){ if(!me){ if(gpsBlocked){ st.startMode='best'; save(); toast('No location available, so I started from the best end of the walk instead.',4500); sp=null; }
+      else { startGPS(true); toast('Getting your location… tap Build again in a few seconds.',4000); return; } } else sp=me; }
+  else { if(st.startHouse==null){ pickingStart=true; show('map'); toast('Tap the house he starts at.',4000); return; } sp=H[st.startHouse]; }
+  toast('Working out the shortest walk…',1500);
+  setTimeout(()=>{ st.route= sp? buildRoute(sp) : buildBest(); st.ptr=0; st.walking=false; save(); drawRoute(); renderRoutePage(); if(document.querySelector('#view-map.on')) fitWalk(); },30);
+}
+$('rBuild').onclick=doBuild;
+$('rStart').onclick=()=>startWalk();
+$('rClear').onclick=()=>{ st.route=[]; st.ptr=0; st.walking=false; save(); drawRoute(); updateWalk(); renderRoutePage(); };
+$('tRoute').onclick=()=>{ if(st.route.length && !st.walking) startWalk(); else if(!st.route.length) show('route'); };
+
+function renderRoutePage(){
+  const n=walkSet.size;
+  $('routeArea').innerHTML = n? `<b>${n} houses</b> on ${st.walk.length} street${st.walk.length>1?'s':''}: ${st.walk.map(esc).join(', ')}` : 'No streets chosen yet.';
+  document.querySelectorAll('#startMode button').forEach(b=>b.classList.toggle('on',b.dataset.s===st.startMode));
+  $('startHint').textContent = st.startMode==='best' ? 'Picks whichever end of the campaign streets gives the shortest total walk. No GPS needed.' : st.startMode==='gps' ? (me? `Using your location (±${Math.round(me.acc)} m).` : 'Turns on GPS and starts at the walk-area house nearest to you.')
+    : (st.startHouse!=null? 'Start: '+H[st.startHouse].addr+' (tap the button again to change).' : 'You will tap the start house on the map.');
+  $('rStart').disabled=!st.route.length;
+  $('tRoute').classList.toggle('on',!!st.route.length);
+  if(st.route.length){ const m=routeLength(st.route); const walkMin=m/80; // ~80 m/min walking
+    const doors=st.route.length*4; // ~4 min talking per door on average (doors not answered pull this down)
+    $('routeSummary').innerHTML=`<div class="est"><b>${st.route.length} stops</b> · ${fmtMi(m)} of walking (${fmtH(walkMin)} on foot)<br>
+     With about 4 min at each door: <b>${fmtH(walkMin+doors)}</b> in total. Start: ${esc(H[st.route[0]].addr)} → finish: ${esc(H[st.route.at(-1)].addr)}</div>
+     <table class="t" style="margin-top:10px"><tr><th>#</th><th>Address</th><th class="num">From previous</th></tr>
+     ${st.route.slice(0,400).map((i,k)=>`<tr><td>${k+1}</td><td>${esc(H[i].addr)}</td><td class="num">${k?fmtM(dist(H[st.route[k-1]],H[i])):'—'}</td></tr>`).join('')}</table>`;
+  } else $('routeSummary').innerHTML='<div class="tiny">No path built yet.</div>';
+}
+
+// ---------------- walk mode ----------------
+function startWalk(){
+  if(!st.route.length){ show('route'); return; }
+  st.walking=true; // resume at first not-yet-visited stop
+  const k=st.route.findIndex(i=>!st.visit[i]); st.ptr=k<0?0:k; save();
+  show('map'); startGPS(); updateWalk(); setTimeout(walkCamera,80);
+}
+function updateWalk(quiet){
+  const on=st.walking && st.route.length;
+  $('walkBanner').classList.toggle('on',!!on); $('topbar').style.display=on?'none':''; $('legend').style.display=on?'none':'';
+  requestAnimationFrame(()=>{ document.querySelector('.maptools').style.top = on? ($('walkBanner').offsetHeight+24)+'px' : ''; });
+  if(!on){ drawSel(); renderHouseCard(); drawRoute(); return; }
+  const i=st.route[st.ptr], nx=st.route[st.ptr+1];
+  $('wbLbl').textContent=`Stop ${st.ptr+1} of ${st.route.length}`+(st.visit[i]?` · ${st.visit[i]==='talked'?'talked':'not home'}`:'');
+  if($('wbNowTxt').textContent!==H[i].addr){ $('wbNowTxt').textContent=H[i].addr; $('wbIcon').innerHTML=CURSVG(); const a=$('wbNow'); a.classList.remove('swap'); void a.offsetWidth; a.classList.add('swap'); }
+  $('wbNext').textContent= nx!=null? H[nx].addr : 'Last house';
+  $('wbDist').textContent= nx!=null? '· '+fmtM(dist(H[i],H[nx])) : '';
+  const doneN=st.route.filter(x=>st.visit[x]).length; $('wbProg').style.width=(100*doneN/st.route.length)+'%';
+  if(!quiet){ drawSel(); drawRoute(); renderWalkTags();
+    if(Date.now()-userPannedAt>12000) walkCamera(); }
+}
+function renderWalkTags(){} // tags are given in the post-recording sheet and via ✓ Talked
+function advance(){ if(st.ptr<st.route.length-1){ st.ptr++; save(); updateWalk(); } else { toast('That was the last house on the route.'); updateWalk(); } }
+$('wbDone').onclick=()=>{ buzz(); const i=st.route[st.ptr]; st.visit[i]='talked'; save(); restyle(i); openTagSheet(i, null, true); };
+$('wbNH').onclick=()=>{ buzz(); const i=st.route[st.ptr], prev=st.visit[i], p0=st.ptr; st.visit[i]='nothome'; save(); restyle(i); advance();
+  toast('Not home · '+H[i].addr,4500,{label:'Undo',fn:()=>{ if(prev) st.visit[i]=prev; else delete st.visit[i]; st.ptr=p0; save(); restyle(i); updateWalk(); }}); };
+$('wbSkip').onclick=()=>{ const p0=st.ptr, i=st.route[p0]; advance(); toast('Skipped '+H[i].addr,4000,{label:'Undo',fn:()=>{ st.ptr=p0; save(); updateWalk(); }}); };
+$('wbEnd').onclick=()=>{ st.walking=false; save(); updateWalk(); renderRoutePage(); toast('Walk paused. Start it again from the route button; it resumes at the first unvisited house.',4000); };
+
+// ---------------- tag sheet ----------------
+function openTagSheet(i, noteId, thenAdvance){
+  openSheet(`<div class="grab"></div><h3>${esc(H[i].addr)}</h3><p class="sub">Where does this household stand on re-electing him?</p>
+   <div class="bigchoice">${TAGS.map(t=>`<button data-t="${t[0]}">${houseSVG(css(t[2]),{roofSide:shade(css(t[2]),-.18)})}${t[1]}</button>`).join('')}</div>
+   <p class="sub" style="margin:12px 0 6px">Yard sign?</p>
+   <div class="bigchoice two"><button data-sg="yes">Yes, put one up</button><button data-sg="no">No sign</button></div>
+   <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn" id="tsSkip">Decide later</button></div>`);
+  let chosenT=st.tag[i]||null, chosenS=st.sign[i]||null;
+  const paint=()=>{ document.querySelectorAll('#sheet [data-t]').forEach(b=>b.classList.toggle('picked', b.dataset.t===chosenT));
+    document.querySelectorAll('#sheet [data-sg]').forEach(b=>b.classList.toggle('picked', b.dataset.sg===chosenS)); };
+  paint();
+  const finish=async()=>{ if(chosenT){ st.tag[i]=chosenT; st.visit[i]='talked'; if(noteId){ await tagNote(noteId,chosenT);} }
+    if(chosenS){ st.sign[i]=chosenS; } save(); restyle(i); refreshBadges(); renderHouseCard(); closeSheet(); buzz([10,40,10]);
+    if(chosenS==='yes') confetti($('fabSign')); if(thenAdvance) advance(); };
+  document.querySelectorAll('#sheet [data-t]').forEach(b=>b.onclick=()=>{ chosenT=b.dataset.t; paint(); if(chosenS) finish(); });
+  document.querySelectorAll('#sheet [data-sg]').forEach(b=>b.onclick=()=>{ chosenS=b.dataset.sg; paint(); if(chosenT) finish(); });
+  $('tsSkip').onclick=finish;
+}
+async function tagNote(id,t){ const ns=await allNotes(); const n=ns.find(x=>x.id===id); if(n){ n.tag=t; await putNote(n);} }
+
+// ---------------- sign FAB ----------------
+$('fabSign').onclick=()=>{
+  const i=curHouse(); if(i==null){ toast('Tap a house on the map first (or start the walk).'); return; }
+  openSheet(`<div class="grab"></div><h3>Sign at ${esc(H[i].addr)}?</h3><p class="sub">Did the resident agree to a yard sign?</p>
+   <div class="bigchoice two"><button data-sg="yes">👍 Yes, put one up</button><button data-sg="no">No sign</button></div>
+   ${st.sign[i]?`<div class="row" style="justify-content:flex-end"><button class="btn sm" id="sgClear">Clear answer (${st.sign[i]})</button></div>`:''}`);
+  document.querySelectorAll('#sheet [data-sg]').forEach(b=>b.onclick=()=>{ st.sign[i]=b.dataset.sg; save(); refreshBadges(); renderHouseCard(); closeSheet(); buzz(); if(b.dataset.sg==='yes') confetti($('fabSign')); toast('Sign: '+(b.dataset.sg==='yes'?'Yes':'No')+' · '+H[i].addr); });
+  const c=$('sgClear'); if(c) c.onclick=()=>{ delete st.sign[i]; save(); refreshBadges(); renderHouseCard(); closeSheet(); };
+};
+
+// ---------------- recording ----------------
+let rec=null, chunks=[], recStart=0, recTimer=null, recHouse=null;
+function pickMime(){ const c=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/aac','audio/ogg']; for(const m of c){ try{ if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; }catch(e){} } return ''; }
+$('fabRec').onclick=()=>{
+  if(rec && rec.state==='recording'){ rec.stop(); return; }
+  const i=curHouse(); if(i==null){ toast('Tap a house on the map first (or start the walk), so the note is filed under it.',3500); return; }
+  openSheet(`<h3>Record at ${esc(H[i].addr)}</h3>
+   <p class="sub">California generally requires everyone in a private conversation to agree before it's recorded. Ask first, and only record if they say yes.</p>
+   <label class="consent"><input type="checkbox" id="cOk"><span>The resident agreed to this conversation being recorded.</span></label>
+   <div class="row" style="justify-content:flex-end"><button class="btn" id="cNo">Cancel</button><button class="btn primary" id="cGo" disabled>Start recording</button></div>
+   <p class="tiny" style="margin-top:10px">If they decline, skip the recording and just tap ✓ Talked → tag Support / Unsure / Against.</p>`);
+  $('cOk').onchange=e=>$('cGo').disabled=!e.target.checked;
+  $('cNo').onclick=closeSheet;
+  $('cGo').onclick=()=>{ closeSheet(); beginRec(i); };
+};
+async function beginRec(i){
+  if(!navigator.mediaDevices || !window.MediaRecorder){ toast('This browser cannot record audio here (needs https and a modern browser).',4500); return; }
+  let stream; try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ toast('Microphone blocked. Allow it for this page in browser settings.',4500); return; }
+  const mime=pickMime(); chunks=[]; recHouse=i;
+  try{ rec=new MediaRecorder(stream, mime?{mimeType:mime}:undefined); }catch(e){ rec=new MediaRecorder(stream); }
+  rec.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+  rec.onstop=async()=>{ stream.getTracks().forEach(t=>t.stop()); clearInterval(recTimer);
+    $('fabRec').classList.remove('live'); $('recLbl').textContent='Record'; $('recTime').classList.remove('on');
+    const blob=new Blob(chunks,{type:rec.mimeType||mime||'audio/webm'});
+    const note={id:Date.now()+'-'+recHouse, house:recHouse, addr:H[recHouse].addr, ts:Date.now(), dur:Math.round((Date.now()-recStart)/1000), type:blob.type, blob, tag:null};
+    await putNote(note); noteCount[recHouse]=(noteCount[recHouse]||0)+1; refreshBadges();
+    if(!st.visit[recHouse]){ st.visit[recHouse]='talked'; save(); restyle(recHouse); }
+    toast('Saved under '+H[recHouse].addr);
+    openTagSheet(recHouse, note.id, st.walking && st.route[st.ptr]===recHouse);
+  };
+  rec.start(1000); recStart=Date.now();
+  $('fabRec').classList.add('live'); $('recLbl').textContent='Stop'; $('recTime').classList.add('on');
+  const tick=()=>{ const s=Math.floor((Date.now()-recStart)/1000); $('recTxt').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')+' · '+H[recHouse].addr; };
+  tick(); recTimer=setInterval(tick,500);
+}
+
+// ---------------- voice notes tab ----------------
+let noteCount={}; let notesFilter='all'; const urls=[];
+$('notesFilter').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; notesFilter=b.dataset.f; document.querySelectorAll('#notesFilter button').forEach(x=>x.classList.toggle('on',x===b)); renderNotes(); });
+async function renderNotes(){
+  urls.splice(0).forEach(u=>URL.revokeObjectURL(u));
+  let ns=(await allNotes()).sort((a,b)=>b.ts-a.ts);
+  const cur=curHouse();
+  if(notesFilter==='cur') ns=ns.filter(n=>n.house===cur);
+  const el=$('notesList');
+  if(!ns.length){ el.innerHTML=`<div class="empty">${EMPTY_ART()}${notesFilter==='cur'? (cur==null?'No house selected. Tap one on the map.':'No notes yet for '+esc(H[cur].addr)+'.') : 'No voice notes yet.<br>Use the red Record button on the map, at the house you\'re at.'}</div>`; return; }
+  el.innerHTML=ns.map(n=>{ const u=URL.createObjectURL(n.blob); urls.push(u); const d=new Date(n.ts);
+    return `<div class="note" data-id="${n.id}"><div><div class="t">${esc(n.addr)}</div><div class="tiny">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · ${Math.floor(n.dur/60)}:${String(n.dur%60).padStart(2,'0')}</div></div>
+    <div class="tiny">${n.tag? `<span class="pill"><i style="background:var(${TAGS.find(t=>t[0]===n.tag)[2]})"></i>${TAGS.find(t=>t[0]===n.tag)[1]}</span>`:'<span class="pill">Not tagged</span>'}</div>
+    <audio controls preload="none" src="${u}"></audio>
+    <div class="acts"><div class="seg">${TAGS.map(t=>`<button data-t="${t[0]}" class="${n.tag===t[0]?'on':''}">${t[1]}</button>`).join('')}</div>
+    <a class="btn sm" download="${esc(n.addr.replace(/[^\w]+/g,'_'))}_${n.ts}.${(n.type||'').includes('mp4')?'m4a':'webm'}" href="${u}">Download</a>
+    <button class="btn sm" data-go="${n.house}">Show on map</button><button class="btn sm danger" data-del="${n.id}">Delete</button></div></div>`; }).join('');
+  el.querySelectorAll('.seg button').forEach(b=>b.onclick=async()=>{ const id=b.closest('.note').dataset.id; const n=ns.find(x=>x.id===id);
+    await tagNote(id,b.dataset.t); st.tag[n.house]=b.dataset.t; st.visit[n.house]='talked'; save(); restyle(n.house); renderNotes(); });
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!b.dataset.sure){ b.dataset.sure=1; b.textContent='Tap again to delete'; return; }
+    const n=ns.find(x=>x.id===b.dataset.del); await delNote(b.dataset.del); noteCount[n.house]=Math.max(0,(noteCount[n.house]||1)-1); refreshBadges(); renderNotes(); });
+  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.go; show('map'); setTimeout(()=>goTo(H[i],18.5),60); if(!st.walking) selectHouse(i); });
+}
+$('dlAllNotes').onclick=async()=>{ const ns=await allNotes(); if(!ns.length){toast('No notes to download.');return;}
+  for(const n of ns){ const a=document.createElement('a'); a.href=URL.createObjectURL(n.blob); a.download=n.addr.replace(/[^\w]+/g,'_')+'_'+n.ts+((n.type||'').includes('mp4')?'.m4a':'.webm'); document.body.appendChild(a); a.click(); a.remove(); await new Promise(r=>setTimeout(r,350)); } };
+
+// ---------------- signs tab ----------------
+let signFilter='yes';
+$('signFilter').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; signFilter=b.dataset.f; document.querySelectorAll('#signFilter button').forEach(x=>x.classList.toggle('on',x===b)); renderSigns(); });
+function signRows(f){ return Object.keys(st.sign).filter(i=>st.sign[i]===f).map(Number).sort((a,b)=>H[a].s.localeCompare(H[b].s)||(parseInt(H[a].n)-parseInt(H[b].n))); }
+function renderSigns(){
+  const rows=signRows(signFilter); const el=$('signList');
+  if(!rows.length){ el.innerHTML=`<div class="empty">${EMPTY_ART()}${signFilter==='yes'?'No sign agreements yet.<br>Use the Sign button on the map at each house.':'Nobody has declined a sign yet.'}</div>`; return; }
+  el.innerHTML=`<table class="t"><tr><th>Address</th><th>Vote stance</th><th></th></tr>${rows.map(i=>`<tr><td>${esc(H[i].addr)}</td><td>${st.tag[i]?TAGS.find(t=>t[0]===st.tag[i])[1]:'<span class="tiny">not tagged</span>'}</td><td style="text-align:right"><button class="btn sm" data-go="${i}">Map</button></td></tr>`).join('')}</table>`;
+  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.go; show('map'); setTimeout(()=>goTo(H[i],18.5),60); if(!st.walking) selectHouse(i); });
+}
+$('signCsv').onclick=()=>{ const rows=signRows(signFilter); const csv='address,street,house_number,unit,sign,vote_stance,lat,lng\n'+rows.map(i=>[H[i].addr,H[i].s,H[i].n,H[i].u,st.sign[i],st.tag[i]||'',H[i].lat,H[i].lng].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='lapalma_signs_'+signFilter+'.csv'; a.click(); };
+
+// ---------------- stats ----------------
+function renderStats(){
+  const walkN=walkSet.size, visited=Object.keys(st.visit), talked=visited.filter(i=>st.visit[i]==='talked').length, nh=visited.filter(i=>st.visit[i]==='nothome').length;
+  const tags=Object.values(st.tag); const cnt={support:0,unsure:0,against:0}; tags.forEach(t=>cnt[t]++); const tot=tags.length;
+  const sy=Object.values(st.sign).filter(v=>v==='yes').length, sn=Object.values(st.sign).filter(v=>v==='no').length;
+  const KI={home:'<path d="M3 11 12 4l9 7v9H3z"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/>',door:'<rect x="6" y="3" width="12" height="18" rx="1"/><circle cx="14.5" cy="12" r="1"/>',sign:'<rect x="4" y="4" width="16" height="10" rx="1.5"/><path d="M9 14v7M15 14v7"/>'};
+  $('kpis').innerHTML=[[walkN,'houses in walk area','home','#38b8ec'],[talked,'conversations','chat','#2a78d6'],[nh,'not home','door','#86857f'],[sy,'signs agreed','sign','#0ca30c']].map(k=>`<div class="kpi" style="--kc:${k[3]}"><span class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">${KI[k[2]]}</svg></span><div class="v" data-n="${k[0]}">0</div><div class="l">${k[1]}</div></div>`).join('');
+  document.querySelectorAll('#kpis .v').forEach(el=>{ const n=+el.dataset.n, t0=performance.now(); const f=t=>{ const p=Math.min(1,(t-t0)/700), e=1-Math.pow(1-p,3); el.textContent=Math.round(n*e).toLocaleString(); if(p<1) requestAnimationFrame(f); }; requestAnimationFrame(f); });
+  $('sentBase').textContent= tot? `Based on ${tot} tagged household${tot>1?'s':''}`+(walkN?` (${Math.round(100*tot/walkN)}% of the walk area)`:'')+'. Small numbers swing a lot; treat under ~30 as a hint, not a result.' : '';
+  if(!tot){ $('sentStack').innerHTML=''; $('sentLegend').innerHTML='<div class="empty" style="grid-column:1/-1">No tagged conversations yet. Tag each one Support / Unsure / Against after talking.</div>'; $('sentTable').innerHTML=''; }
+  else {
+    $('sentStack').innerHTML=TAGS.filter(t=>cnt[t[0]]).map(t=>`<div style="flex:${cnt[t[0]]};background:var(${t[2]})" data-tip="${t[1]}: ${cnt[t[0]]} (${Math.round(100*cnt[t[0]]/tot)}%)"></div>`).join('');
+    $('sentLegend').innerHTML=TAGS.map(t=>`<div class="it"><i style="background:var(${t[2]})"></i><div><div class="p">${Math.round(100*cnt[t[0]]/tot)}%</div><div class="n">${t[1]==='Support'?'In favour':t[1]==='Unsure'?'Not sure':'Not in favour'} · ${cnt[t[0]]}</div></div></div>`).join('');
+    $('sentTable').innerHTML='<tr><th>Stance</th><th class="num">Houses</th><th class="num">Share</th></tr>'+TAGS.map(t=>`<tr><td>${t[1]}</td><td class="num">${cnt[t[0]]}</td><td class="num">${(100*cnt[t[0]]/tot).toFixed(1)}%</td></tr>`).join('');
+    $('sentStack').querySelectorAll('[data-tip]').forEach(d=>{ d.onmousemove=e=>{const tp=$('tip');tp.textContent=d.dataset.tip;tp.style.display='block';tp.style.left=(e.clientX+12)+'px';tp.style.top=(e.clientY-30)+'px';}; d.onmouseleave=()=>$('tip').style.display='none'; });
+  }
+  const sTot=sy+sn;
+  $('signStats').innerHTML= sTot? `<div class="row" style="justify-content:space-between"><span><b>${sy}</b> agreed · <b>${sn}</b> declined</span><span class="tiny">${Math.round(100*sy/sTot)}% said yes</span></div><div class="bar2" style="margin-top:8px"><i style="width:${100*sy/sTot}%"></i></div>
+    <p class="tiny" style="margin-top:8px">Of supporters asked, ${(()=>{const sup=Object.keys(st.sign).filter(i=>st.tag[i]==='support');return sup.length? Math.round(100*sup.filter(i=>st.sign[i]==='yes').length/sup.length)+'% took a sign':'none tagged yet';})()}.</p>` : '<div class="empty">No sign answers yet.</div>';
+  const per={}; Object.keys(st.tag).forEach(i=>{ const s=H[i].s; per[s]=per[s]||{support:0,unsure:0,against:0,n:0}; per[s][st.tag[i]]++; per[s].n++; });
+  const rows=Object.entries(per).sort((a,b)=>(b[1].support/b[1].n)-(a[1].support/a[1].n)||b[1].n-a[1].n);
+  $('streetTable').innerHTML= rows.length? '<tr><th>Street</th><th class="num">Tagged</th><th class="num">Support</th><th class="num">Unsure</th><th class="num">Against</th></tr>'+rows.map(([s,c])=>`<tr><td>${esc(s)}</td><td class="num">${c.n}</td><td class="num">${Math.round(100*c.support/c.n)}%</td><td class="num">${Math.round(100*c.unsure/c.n)}%</td><td class="num">${Math.round(100*c.against/c.n)}%</td></tr>`).join('') : '<tr><td class="empty">Nothing tagged yet.</td></tr>';
+}
+$('exportJson').onclick=async()=>{ const ns=await allNotes();
+  const out={exported:new Date().toISOString(), walkStreets:st.walk,
+    houses:[...new Set([...walkSet, ...Object.keys(st.visit).map(Number), ...Object.keys(st.tag).map(Number), ...Object.keys(st.sign).map(Number)])].map(i=>({address:H[i].addr,lat:H[i].lat,lng:H[i].lng,visit:st.visit[i]||null,stance:st.tag[i]||null,sign:st.sign[i]||null,voiceNotes:ns.filter(n=>n.house===i).length})),
+    route:st.route.map(i=>H[i].addr)};
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)],{type:'application/json'})); a.download='lapalma_walk_'+new Date().toISOString().slice(0,10)+'.json'; a.click(); };
+$('resetAll').onclick=async()=>{ const b=$('resetAll'); if(!b.dataset.sure){ b.dataset.sure=1; b.textContent='Tap again: deletes all tags, signs and audio'; return; }
+  const ns=await allNotes(); for(const n of ns) await delNote(n.id); st=blank(); save(); walkSet=new Set(); noteCount={}; restyleAll(); drawRoute(); updateWalk(); updateAreaChip(); refreshBadges(); renderStats(); b.dataset.sure=''; b.textContent='Reset everything'; toast('Everything cleared.'); };
+
+// ---------------- badges & boot ----------------
+function refreshBadges(){ const set=(id,v)=>{ const el=$(id); if(el.textContent!==String(v)){ el.textContent=v; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); } };
+  set('b-notes',Object.values(noteCount).reduce((a,b)=>a+b,0)); set('b-signs',Object.values(st.sign).filter(v=>v==='yes').length); }
+function renderLegend(){ $('legend').innerHTML=[[CURSVG(),'You are here'],[houseSVG('#cfd5de',{roofSide:'#b5bdc9'}),'To visit'],
+  ...TAGS.map(t=>[houseSVG(css(t[2]),{roofSide:shade(css(t[2]),-.18)}),t[1]]),[houseSVG('#14213d'),'Talked, no tag'],[houseSVG('#cfd5de',{faded:true}),'Not home']]
+  .map(r=>`<span>${r[0]}${r[1]}</span>`).join(''); }
+const EMPTY_ART=()=>`<svg viewBox="0 0 140 80">${[[8,34,.8],[40,26,.9],[96,30,.85]].map(([x,y,k])=>`<g transform="translate(${x},${y}) scale(${k})">${houseSVG('#dfe3ea').replace(/^<svg[^>]*>|<\/svg>$/g,'')}</g>`).join('')}<g transform="translate(58,30) scale(1.15)">${CURSVG().replace(/^<svg[^>]*>|<\/svg>$/g,'')}</g></svg>`;
+(async()=>{ const ns=await allNotes(); ns.forEach(n=>noteCount[n.house]=(noteCount[n.house]||0)+1); refreshBadges(); })();
+renderLegend(); updateAreaChip(); drawRoute(); updateWalk(); renderRoutePage();
+if(!walkSet.size) setTimeout(()=>toast('Start by choosing this weekend\'s streets (top-left).',4000),800);
+})();
+</script>
+</body>
+</html>
